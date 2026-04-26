@@ -1,0 +1,6 @@
+{
+  "name": "圣多纳释放助手",
+  "description": "一个专业的圣多纳释放法助手，帮助你释放内在执念，获得内心平静与自由。",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}
