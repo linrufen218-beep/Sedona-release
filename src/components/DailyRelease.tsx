@@ -130,7 +130,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
       });
     } catch (error: any) {
       console.error(error);
-      alert(error.message || '鍒嗘瀽澶辫触锛岃妫€鏌?Worker 閰嶇疆鎴栫綉缁?);
+      alert(error.message || '分析失败，请检查 Worker 配置或网络。');
       setStep('input');
     } finally {
       setIsAnalyzing(false);
@@ -201,31 +201,31 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
 
     if (isSubQuestion) {
       if (group && group.steps[sixStepIndex]?.hasBranch) {
-        return group.steps[sixStepIndex].branchQuestion || '浣犳兂琛ュ厖浠€涔堝悧锛?;
+        return group.steps[sixStepIndex].branchQuestion || '你想补充什么吗？';
       }
       const isThreeSteps = activeSteps.length === THREE_STEPS.length && activeSteps[0] === THREE_STEPS[0];
       if (isThreeSteps && (sixStepIndex === 0 || sixStepIndex === 1)) {
         const wants = analysis?.list?.[currentSentenceIndex]?.w || [];
-        const wantLabels = wants.map((w: any) => WANT_LABELS[w as WantType]).filter(Boolean).join('銆?);
-        return `浣犺兘璇嗗埆杩欐槸${wantLabels || '鍝鎯宠'}鍚楋紵`;
+        const wantLabels = wants.map((w: any) => WANT_LABELS[w as WantType]).filter(Boolean).join(', ');
+        return `你能识别这是${wantLabels || '某种想要'}吗？`;
       }
-      return '浣犺兘璇嗗埆杩欐槸鍝鎯宠鍚楋紵';
+      return '你能识别这是什么想要吗？';
     }
 
     const stepText = activeSteps[sixStepIndex];
     
     if (activeSteps.length === THREE_STEPS.length && activeSteps[0] === THREE_STEPS[0]) {
-      if (sixStepIndex === 0) return `浣犲厑璁歌繖绉嶆劅瑙夊瓨鍦ㄥ悧锛焋;
+      if (sixStepIndex === 0) return '你允许这种感觉存在吗？';
       if (sixStepIndex === 1) {
         if (prevStepWasNegative) {
           const currentItem = analysis?.list?.[currentSentenceIndex];
           const wants = currentItem?.w || [];
-          const wantLabels = wants.map((w: any) => WANT_LABELS[w as WantType]).filter(Boolean).join('銆?);
-          return `浣犺兘璇嗗埆杩欐槸${wantLabels || '鍝鎯宠'}鍚楋紵`;
+          const wantLabels = wants.map((w: any) => WANT_LABELS[w as WantType]).filter(Boolean).join(', ');
+          return `你能识别这是${wantLabels || '某种想要'}吗？`;
         }
-        return `浣犺兘璇嗗埆杩欐槸鍝鎯宠鍚楋紵`;
+        return '你能识别这是什么想要吗？';
       }
-      if (sixStepIndex === 2) return `浣犺兘閲婃斁瀹冨悧锛焋;
+      if (sixStepIndex === 2) return '你能释放它吗？';
     }
     
     return stepText;
@@ -237,28 +237,28 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
     if (isSubQuestion) {
       if (group && group.steps[sixStepIndex]?.hasBranch) {
         const branchText = group.steps[sixStepIndex].branchQuestion || '';
-        if (branchText.includes('鍏佽')) return { primary: '鍏佽', secondary: '涓嶅厑璁? };
-        if (branchText.includes('鎰挎剰')) return { primary: '鎰挎剰', secondary: '涓嶆効鎰? };
-        if (branchText.includes('鑳?) || branchText.includes('鍙互')) return { primary: '鑳?, secondary: '涓嶈兘' };
-        if (branchText.includes('浠€涔堟椂鍊?) || branchText.includes('浣曟椂')) return { primary: '鐜板湪', secondary: '浠ュ悗' };
+        if (branchText.includes('allow')) return { primary: '允许', secondary: '还不能' };
+        if (branchText.includes('willing')) return { primary: '愿意', secondary: '不愿意' };
+        if (branchText.includes('can')) return { primary: '能', secondary: '不能' };
+        if (branchText.includes('when')) return { primary: '现在', secondary: '以后' };
       }
-      return { primary: '鑳?, secondary: '涓嶈兘' };
+      return { primary: '能', secondary: '不能' };
     }
 
     if (group && group.steps[sixStepIndex]) {
       return { 
-        primary: group.steps[sixStepIndex].positive || '鑳?, 
-        secondary: group.steps[sixStepIndex].negative || '涓嶈兘' 
+        primary: group.steps[sixStepIndex].positive || '能', 
+        secondary: group.steps[sixStepIndex].negative || '不能' 
       };
     }
 
     const stepText = activeSteps[sixStepIndex];
-    if (stepText.includes('鍏佽')) return { primary: '鍏佽', secondary: '涓嶅厑璁? };
-    if (stepText.includes('鎰挎剰')) return { primary: '鎰挎剰', secondary: '涓嶆効鎰? };
-    if (stepText.includes('鑳?) || stepText.includes('鍙互')) return { primary: '鑳?, secondary: '涓嶈兘' };
-    if (stepText.includes('浠€涔堟椂鍊?) || stepText.includes('浣曟椂')) return { primary: '鐜板湪', secondary: '浠ュ悗' };
+    if (stepText.includes('allow')) return { primary: '允许', secondary: '还不能' };
+    if (stepText.includes('willing')) return { primary: '愿意', secondary: '不愿意' };
+    if (stepText.includes('can')) return { primary: '能', secondary: '不能' };
+    if (stepText.includes('when')) return { primary: '现在', secondary: '以后' };
     
-    return { primary: '鑳?, secondary: '涓嶈兘' };
+    return { primary: '能', secondary: '不能' };
   };
 
   const nextStep = (isPrimary: boolean) => {
@@ -283,7 +283,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
     setPrevStepWasNegative(!isPrimary && !isSubQuestion);
 
     // Task: If on Step 2 of Three Steps and user clicks "No" (Secondary)
-    // Three steps are: 0: 鍏佽瀛樺湪, 1: 璇嗗埆鎯宠, 2: 鍏佽鏀句笅
+    // Three steps are: allow the feeling, identify the want, release it.
     const isThreeSteps = activeSteps.length === THREE_STEPS.length && activeSteps[0] === THREE_STEPS[0];
     if (isThreeSteps && sixStepIndex === 1 && !isPrimary) {
       setIsSubQuestion(true);
@@ -329,9 +329,9 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
     const newAnalysis = { ...analysis };
     newAnalysis.list[currentSentenceIndex] = {
       ...newAnalysis.list[currentSentenceIndex],
-      s: `(娣卞叆) ${moreReleaseEmotion}`,
+      s: `(深入) ${moreReleaseEmotion}`,
       w: moreReleaseWants,
-      a: `閽堝鈥?{moreReleaseEmotion}鈥濈殑杩涗竴姝ラ噴鏀綻
+      a: `针对“${moreReleaseEmotion}”的进一步释放引导`,
     };
     
     setAnalysis(newAnalysis);
@@ -415,7 +415,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
       analysis: analysis,
       timestamp: Date.now(),
     });
-    alert('璁板綍宸叉墜鍔ㄤ繚瀛?);
+    alert('记录已手动保存。');
   };
 
   const handleQuit = (moveToStuck: boolean) => {
@@ -427,7 +427,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
             text: s.s,
             wants: s.w,
             analysis: s.a,
-            source: '鏃ュ父閲婃斁'
+            source: '日常释放'
           });
         }
       });
@@ -476,7 +476,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
       }
     } catch (error: any) {
       console.error(error);
-      alert(error.message || '鍒嗘瀽澶辫触锛岃妫€鏌ョ綉缁?);
+      alert(error.message || '分析失败，请检查网络。');
     } finally {
       setIsExploringMore(false);
     }
@@ -489,13 +489,13 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
           <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="px-1">
             <Card className="border-none shadow-xl bg-card/80 backdrop-blur-md">
               <CardHeader className="py-4 md:py-6">
-                <CardTitle className="text-xl md:text-2xl font-serif text-foreground">璁板綍褰撲笅鐨勬劅鍙?/CardTitle>
-                <CardDescription className="text-xs md:text-sm">浣犲彲浠ラ噴鏀句换浣曡礋闈㈡垨姝ｉ潰鐨勬儏缁€?/CardDescription>
+                <CardTitle className="text-xl md:text-2xl font-serif text-foreground">记录当下的感受</CardTitle>
+                <CardDescription className="text-xs md:text-sm">你可以释放任何负面或正面的情绪。</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 relative px-3 md:px-6 pb-6">
                 <div className="relative">
                   <Textarea
-                    placeholder="鎴戠幇鍦ㄦ劅鍒?.."
+                    placeholder="我现在感觉到什么？"
                     className="min-h-[220px] md:min-h-[250px] text-base md:text-lg leading-relaxed resize-none bg-background/50 border-border/50 focus-visible:ring-accent pr-12"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -514,10 +514,10 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 md:h-6 md:w-6 animate-spin" />
-                      AI 娣卞害鍒嗘瀽涓?..
+                      AI 正在深度分析中...
                     </>
                   ) : (
-                    '寮€濮嬫繁搴﹀垎鏋?
+                    '开始深度分析'
                   )}
                 </Button>
                 <Button 
@@ -526,7 +526,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   onClick={() => setText('')}
                   disabled={isAnalyzing || !text.trim()}
                 >
-                  娓呯┖
+                  清空
                 </Button>
               </CardContent>
             </Card>
@@ -547,12 +547,12 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                 </Button>
                 <div className="pl-8 text-center md:text-left">
                   <CardTitle className="text-lg md:text-xl font-serif">鍦ㄥ綋鍓嶉」鐩腑缁х画鎸栨帢</CardTitle>
-                  <CardDescription className="text-xs md:text-sm">浣犲彲浠ヨˉ鍏呮洿澶氬綋涓嬬殑鎰熻銆佹專鎵庢垨蹇靛ご銆?/CardDescription>
+                  <CardDescription className="text-xs md:text-sm">你可以补充更多当下的感受、拉扯或念头。</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 px-3 md:px-6 pb-6">
                 <Textarea
-                  placeholder="琛ュ厖鏇村..."
+                  placeholder="补充更多..."
                   className="min-h-[220px] md:min-h-[250px] text-base md:text-lg leading-relaxed resize-none bg-background border-border"
                   value={exploreMoreText}
                   onChange={(e) => setExploreMoreText(e.target.value)}
@@ -563,9 +563,9 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   disabled={isExploringMore || !exploreMoreText.trim()}
                 >
                   {isExploringMore ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 鍒嗘瀽涓?..</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> 分析中...</>
                   ) : (
-                    '鍒嗘瀽骞跺悎骞?
+                    '分析并合并'
                   )}
                 </Button>
               </CardContent>
@@ -586,33 +586,33 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
                 <div className="pl-8">
-                  <CardTitle className="text-lg md:text-xl font-serif">鍒嗘瀽缁撴灉涓庤皟鏁?/CardTitle>
-                  <CardDescription className="text-xs md:text-sm">AI 娣卞害鎻ず娼滄剰璇嗘兂瑕併€傜偣鍑烩€?鈥濆彿鍙墜鍔ㄨ皟鏁淬€?/CardDescription>
+                  <CardTitle className="text-lg md:text-xl font-serif">分析结果与调整</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">AI 深度提示潜意识想要。你也可以手动调整。</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 md:space-y-4 px-3 md:px-6 pb-6 pt-0">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-1 p-1 bg-muted/20 rounded-lg">
                     <Button 
-                      className={`flex-1 h-7 text-[9px] md:text-[10px] rounded-md transition-all ${filterMode === 'all' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'all' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
                       variant="ghost"
                       onClick={() => setFilterMode('all')}
                     >
-                      鍏ㄩ儴 ({analysis.list.length})
+                      全部 ({analysis.list.length})
                     </Button>
                     <Button 
-                      className={`flex-1 h-7 text-[9px] md:text-[10px] rounded-md transition-all ${filterMode === 'unreleased' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'unreleased' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
                       variant="ghost" 
                       onClick={() => setFilterMode('unreleased')}
                     >
-                      鏈噴鏀?({analysis.list.filter((s: any, i: any) => !s.released && !releasedIndices.includes(i)).length})
+                      未释放 ({analysis.list.filter((s: any, i: any) => !s.released && !releasedIndices.includes(i)).length})
                     </Button>
                     <Button 
-                      className={`flex-1 h-7 text-[9px] md:text-[10px] rounded-md transition-all ${filterMode === 'released' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'released' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
                       variant="ghost" 
                       onClick={() => setFilterMode('released')}
                     >
-                      宸查噴鏀?({analysis.list.filter((s: any, i: any) => s.released || releasedIndices.includes(i)).length})
+                      已释放 ({analysis.list.filter((s: any, i: any) => s.released || releasedIndices.includes(i)).length})
                     </Button>
                   </div>
                   
@@ -625,14 +625,14 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                       }}
                       disabled={!analysis.list || analysis.list.length === 0}
                     >
-                      <RefreshCcw className="w-3.5 h-3.5" /> {isAnalyzing ? '鍒嗘瀽涓?..' : '寮€濮嬮噴鏀?}
+                      <RefreshCcw className="w-3.5 h-3.5" /> {isAnalyzing ? '分析中...' : '开始释放'}
                     </Button>
                     <Button 
                       variant="outline"
                       className="flex-[3] h-10 border-primary/30 hover:bg-primary/5 text-primary gap-1.5 text-xs"
                       onClick={() => setShowExploreMoreUI(true)}
                     >
-                      <Plus className="w-3.5 h-3.5" /> 鍦ㄥ綋鍓嶉」鐩腑鎸栨帢
+                      <Plus className="w-3.5 h-3.5" /> +探索更多想要
                     </Button>
                   </div>
                 </div>
@@ -655,14 +655,14 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                             <div className="flex justify-between items-center">
                               <div className="flex items-center gap-2">
                                 <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest px-1"># {i + 1}</span>
-                                {(s.released || releasedIndices.includes(i)) && <Badge variant="outline" className="text-[7px] md:text-[8px] h-3.5 px-1 border-success text-success bg-success/10">宸查噴鏀?/Badge>}
+                                {(s.released || releasedIndices.includes(i)) && <Badge variant="outline" className="text-[7px] md:text-[8px] h-3.5 px-1 border-success text-success bg-success/10">已释放</Badge>}
                               </div>
                               <button 
                                 onClick={() => toggleManualRelease(i)}
-                                className={`h-5 w-5 shrink-0 rounded-full flex items-center justify-center transition-all ${(s.released || releasedIndices.includes(i)) ? 'bg-success text-white shadow-sm' : 'bg-muted/30 text-muted-foreground hover:bg-success/10 hover:text-success'}`}
-                                title={s.released ? "鍙栨秷鏍囨敞宸查噴鏀? : "鎵嬪姩鏍囨敞宸查噴鏀?}
+                                className={`h-4 w-4 shrink-0 rounded-full flex items-center justify-center transition-all ${(s.released || releasedIndices.includes(i)) ? 'bg-success text-white shadow-sm' : 'bg-muted/30 text-muted-foreground hover:bg-success/10 hover:text-success'}`}
+                                title={s.released ? "取消标注已释放" : "手动标注已释放"}
                               >
-                                <CheckCircle2 className="w-3 h-3" />
+                                <CheckCircle2 className="w-2.5 h-2.5" />
                               </button>
                             </div>
 
@@ -675,8 +675,8 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                               ))}
                               <Popover>
                                 <PopoverTrigger render={
-                                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full bg-primary/10 hover:bg-primary/20 shrink-0">
-                                    <Plus className="w-3 h-3" />
+                                  <Button variant="ghost" size="icon" className="h-4 w-4 rounded-full bg-primary/10 hover:bg-primary/20 shrink-0">
+                                    <Plus className="w-2.5 h-2.5" />
                                   </Button>
                                 } />
                                 <PopoverContent className="w-40 p-1.5 bg-popover/95 backdrop-blur-sm border-border/50">
@@ -709,7 +709,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                             {s.a && (
                               <div className="p-3 rounded-xl bg-accent/5 border border-accent/10">
                                 <p className="text-[11px] md:text-[12px] text-muted-foreground leading-relaxed">
-                                  <span className="font-bold text-accent mr-1 uppercase text-[9px] tracking-tight">瑙ｆ瀽:</span> {s.a}
+                                  <span className="font-bold text-accent mr-1 uppercase text-[9px] tracking-tight">分析:</span> {s.a}
                                 </p>
                               </div>
                             )}
@@ -720,13 +720,13 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                                 className="flex-[2] border-accent/30 hover:bg-accent/10 text-accent rounded-xl h-9 gap-2 text-xs"
                                 onClick={() => startRelease(i, 'single')}
                               >
-                                <Zap className="w-3.5 h-3.5" /> 蹇€熼噴鏀?                              </Button>
+                                <Zap className="w-3.5 h-3.5" /> 快速释放                              </Button>
                               <Button 
                                 variant="outline"
                                 className="flex-1 border-border/30 hover:bg-muted text-muted-foreground rounded-xl h-9 text-xs"
                                 onClick={() => removeSentence(i)}
                               >
-                                鍙栨秷
+                                取消
                               </Button>
                             </div>
                           </div>
@@ -736,7 +736,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                       <div className="p-5 rounded-2xl bg-accent/5 border border-dashed border-accent/20 animate-pulse flex items-center justify-center h-24">
                         <div className="flex flex-col items-center gap-2">
                           <Loader2 className="w-5 h-5 animate-spin text-accent" />
-                          <p className="text-[10px] text-accent font-medium">AI 姝ｅ湪娣卞害鍒嗘瀽涓?..</p>
+                          <p className="text-[10px] text-accent font-medium">AI 正在深度分析中...</p>
                         </div>
                       </div>
                     )}
@@ -745,12 +745,12 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                 
                 <div className="p-4 md:p-5 rounded-xl bg-secondary/10 border border-secondary/20 min-h-[80px]">
                   <h4 className="font-bold text-[11px] md:text-sm mb-2 text-secondary-foreground flex items-center gap-2 uppercase tracking-wide">
-                    <RefreshCcw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAnalyzing ? 'animate-spin' : ''}`} /> 鍒嗘瀽鎬荤粨
+                    <RefreshCcw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAnalyzing ? 'animate-spin' : ''}`} /> 分析总结
                   </h4>
                   {isAnalyzing && (!getAnalysisSummary(analysis) || getAnalysisSummary(analysis).length < 5) ? (
                     <div className="flex items-center gap-2 text-muted-foreground animate-pulse mt-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      <span className="text-[11px]">姝ｅ湪娣卞害鍒嗘瀽鏁翠綋鎵у康...</span>
+                      <span className="text-[11px]">正在深度分析整体执念...</span>
                     </div>
                   ) : (
                     <p className="text-xs md:text-sm leading-relaxed opacity-90 text-foreground/80 italic whitespace-pre-wrap">{getAnalysisSummary(analysis)}</p>
@@ -759,9 +759,9 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button variant="outline" className="flex-1 h-11 md:h-12 border-primary/30 hover:bg-primary/10 text-xs md:text-sm" onClick={() => { reset(); setStep('input'); }}>
-                    娓呯┖骞堕€€鍑?                  </Button>
+                    清空并退出                  </Button>
                   <Button variant="secondary" className="flex-1 h-11 md:h-12 border-accent/30 hover:bg-accent/10 text-xs md:text-sm" onClick={handleManualSave}>
-                    <Save className="w-4 h-4 mr-2" /> 鎵嬪姩淇濆瓨
+                    <Save className="w-4 h-4 mr-2" /> 手动保存
                   </Button>
                 </div>
               </CardContent>
@@ -800,7 +800,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   animate={{ opacity: 1 }} 
                   className="text-[11px] md:text-sm text-muted-foreground italic max-w-sm mx-auto bg-background/50 p-3 rounded-xl border border-border/20 shadow-sm"
                 >
-                  <span className="font-bold text-accent mr-1 uppercase text-[9px] block mb-1">瑙ｆ瀽璇存槑</span>
+                  <span className="font-bold text-accent mr-1 uppercase text-[9px] block mb-1">分析说明</span>
                   {analysis.list[currentSentenceIndex].a}
                 </motion.div>
               )}
@@ -835,14 +835,14 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                             <div className="space-y-2">
                               <h4 className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground flex items-center justify-between gap-1.5">
                                 <div className="flex items-center gap-1.5">
-                                  <StickyNote className="w-3 h-3" /> 閲婃斁璁板綍/渚跨
+                                  <StickyNote className="w-3 h-3" /> 释放记录/便签
                                 </div>
                                 {settings?.enableVoiceInput && (
                                   <VoiceInput size="sm" onResult={(voiceText) => updateSentenceNote(currentSentenceIndex, (analysis.list[currentSentenceIndex].note || '') + voiceText)} />
                                 )}
                               </h4>
                               <Textarea 
-                                placeholder="鍦ㄨ繖閲屾坊鍔犳劅鎮熸垨璁板綍..." 
+                                placeholder="在这里添加感悟或记录..." 
                                 value={analysis.list[currentSentenceIndex].note || ''}
                                 onChange={(e) => updateSentenceNote(currentSentenceIndex, e.target.value)}
                                 className="min-h-[100px] text-xs resize-none bg-background/50 border-border/30 focus:border-accent/40"
@@ -869,7 +869,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                         className="text-[10px] text-muted-foreground hover:text-accent transition-colors underline underline-offset-4"
                         onClick={skipSentence}
                       >
-                        鍏堜笉閲婃斁锛岃烦鍒颁笅涓€鍙?                      </button>
+                        先不释放，跳到下一个                      </button>
                     </div>
                   </motion.div>
                 ) : (
@@ -878,23 +878,23 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                       <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
                         <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
                       </div>
-                      <h3 className="text-lg md:text-xl font-medium">鎰熻濂藉悧锛?/h3>
+                      <h3 className="text-lg md:text-xl font-medium">感觉好些了吗？</h3>
                     </div>
                     <div className="flex flex-col gap-2 md:gap-3">
                       {currentSentenceIndex < analysis.list.length - 1 ? (
                         <Button size="lg" className="h-12 md:h-14 rounded-2xl bg-primary hover:bg-accent text-primary-foreground text-sm md:text-base font-bold shadow-lg" onClick={continueRelease}>
-                          缁х画涓嬩竴鍙?                        </Button>
+                          继续下一句                        </Button>
                       ) : (
                         <>
                           <Button size="lg" className="h-12 md:h-14 rounded-2xl bg-primary hover:bg-accent text-primary-foreground text-sm md:text-base font-bold shadow-lg" onClick={continueRelease}>
-                            瀹屾垚骞堕€€鍑?                          </Button>
+                            完成并退出                          </Button>
                           <Button size="lg" variant="outline" className="h-12 md:h-14 rounded-2xl border-primary text-primary hover:bg-primary/5 text-sm md:text-base font-bold shadow-sm" onClick={restartRelease}>
-                            浠庡ご寮€濮嬮噴鏀?                          </Button>
+                            从头开始释放                          </Button>
                         </>
                       )}
                       
                       <Button variant="outline" size="lg" className="h-12 md:h-14 rounded-2xl border-accent/30 text-accent hover:bg-accent/10 text-sm md:text-base font-medium" onClick={reRelease}>
-                        閲嶆柊閲婃斁杩欎竴鍙?                      </Button>
+                        重新释放这一句                      </Button>
 
 
                       
@@ -903,7 +903,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                         className="text-accent hover:text-accent/80 flex items-center gap-2 text-[11px] md:text-sm h-8 md:h-10 mt-2"
                         onClick={() => setIsMoreReleaseOpen(true)}
                       >
-                        <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" /> 閲婃斁鏇村 (鎺㈢储搴曞眰鎯宠)
+                        <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" /> 释放更多 (探索底层想要)
                       </Button>
                     </div>
                   </motion.div>
@@ -926,15 +926,15 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
       <Dialog open={showQuitDialog} onOpenChange={setShowQuitDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>纭閫€鍑洪噴鏀撅紵</DialogTitle>
+            <DialogTitle>确认退出释放？</DialogTitle>
             <DialogDescription>
-              鎮ㄨ繕鏈夋湭瀹屾垚閲婃斁鐨勫彞瀛愩€傛槸鍚﹂渶瑕佸皢杩欎簺鍙ュ瓙绉诲姩鍒扳€滃寲瑙ｅ崱浣忊€濇澘鍧楋紝浠ヤ究鏃ュ悗澶勭悊锛?            </DialogDescription>
+              你还有未完成释放的句子。是否需要将这些句子移动到“化解卡住”板块，以便日后处理？            </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col sm:flex-row gap-2">
             <Button variant="outline" className="flex-1" onClick={() => handleQuit(false)}>
-              鐩存帴閫€鍑?            </Button>
+              直接退出            </Button>
             <Button className="flex-1 bg-accent hover:bg-accent/80" onClick={() => handleQuit(true)}>
-              绉诲姩鍒扳€滃寲瑙ｅ崱浣忊€濆苟閫€鍑?            </Button>
+              移动到“化解卡住”并退出            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -943,28 +943,28 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-accent" /> 閲婃斁鏇村
+              <Zap className="w-5 h-5 text-accent" /> 释放更多
             </DialogTitle>
             <DialogDescription>
-              娣卞叆鎸栨帢褰撳墠鎰熷彈鑳屽悗鐨勫簳灞傛兂瑕併€?            </DialogDescription>
+              深入挖掘当前感受背后的底层想要。            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
               <Label className="flex items-center justify-between w-full">
-                鐜板湪鐨勬劅鍙?鎯呯华鏄粈涔堬紵
+                现在的感受/情绪是什么？
                 {settings?.enableVoiceInput && (
                   <VoiceInput size="sm" onResult={(voiceText) => setMoreReleaseEmotion(prev => prev + voiceText)} />
                 )}
               </Label>
               <Input 
-                placeholder="渚嬪锛氭劅鍒伴殣绾︾殑鐒﹁檻銆佷笉鐭ユ墍鎺?.." 
+                placeholder="例如：隐约的焦虑、不知所措..."
                 value={moreReleaseEmotion}
                 onChange={(e) => setMoreReleaseEmotion(e.target.value)}
                 className="bg-background/50"
               />
             </div>
             <div className="space-y-2">
-              <Label>杩欒儗鍚庡搴斿摢浜涒€滄兂瑕佲€濓紵</Label>
+              <Label>这背后对应哪些“想要”？</Label>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(WANT_LABELS) as WantType[]).map(w => (
                   <Button
@@ -986,7 +986,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
               disabled={!moreReleaseEmotion.trim() || moreReleaseWants.length === 0}
               onClick={handleMoreRelease}
             >
-              寮€濮嬫繁鍏ュ垎鏋愰噴鏀?            </Button>
+              开始深入分析释放            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
