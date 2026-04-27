@@ -133,6 +133,8 @@ export interface AreaSession {
   areaId: string;
   name: string;
   date: string;
+  projectId?: string;
+  round?: number;
   list: {
     s: string;
     w: string[];

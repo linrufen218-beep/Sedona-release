@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AppSettings, saveSettings, QuestionGroup, QuestionStep } from '@/lib/store';
-import { Settings as SettingsIcon, Save, Trash2, Plus, CheckCircle2, ChevronRight, HelpCircle, Leaf, Copy } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Trash2, Plus, Settings2, ArrowUp, ArrowDown, CheckCircle2, ChevronRight, HelpCircle, Leaf } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -125,23 +125,64 @@ export default function Settings({ settings, onSettingsChange }: SettingsProps) 
     { id: 'stuck_qa', title: '化解卡住 - 问答释放' },
   ];
 
+  const AI_PRESETS = [
+    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', modelName: 'gpt-4o' },
+    { id: 'gemini', name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', modelName: 'gemini-2.0-flash' },
+    { id: 'minimax', name: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1', modelName: 'abab6.5s-chat' },
+    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', modelName: 'deepseek-chat' },
+    { id: 'claude', name: 'Claude', baseUrl: 'https://api.anthropic.com/v1', modelName: 'claude-3-haiku-20240307' },
+    { id: 'doubao', name: '豆包 (Doubao)', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', modelName: 'doubao-pro-32k' },
+    { id: 'kimi', name: 'Kimi (月之暗面)', baseUrl: 'https://api.moonshot.cn/v1', modelName: 'moonshot-v1-8k' },
+    { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', modelName: 'glm-4-flash' },
+    { id: 'custom', name: '自定义接口', baseUrl: '', modelName: '' },
+  ];
+
+  const [isEditingConfigs, setIsEditingConfigs] = useState(false);
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = AI_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    if (presetId === 'custom') {
+      // 自定义接口：清空字段让用户自己填
+      updateSettings({ ...settings, aiBaseUrl: '', aiModelName: '' });
+      return;
+    }
+    updateSettings({
+      ...settings,
+      aiBaseUrl: preset.baseUrl,
+      aiModelName: preset.modelName,
+    });
+  };
+
   const handleAddCustomConfig = () => {
     const newConfig = {
       id: crypto.randomUUID(),
-      name: `新配置 ${ (settings.customAiConfigs?.length || 0) + 1 }`,
-      baseUrl: editConfig.aiBaseUrl || '',
-      apiKey: editConfig.aiApiKey || '',
-      modelName: editConfig.aiModelName || '',
+      name: settings.customAiConfigs?.find(c => c.id === settings.selectedCustomConfigId)?.name || `新配置 ${ (settings.customAiConfigs?.length || 0) + 1 }`,
+      baseUrl: settings.aiBaseUrl || '',
+      apiKey: settings.aiApiKey || '',
+      modelName: settings.aiModelName || '',
     };
     updateSettings({
       ...settings,
       customAiConfigs: [...(settings.customAiConfigs || []), newConfig],
       selectedCustomConfigId: newConfig.id,
       useCustomConfig: true,
-      aiBaseUrl: newConfig.baseUrl,
-      aiApiKey: newConfig.apiKey,
-      aiModelName: newConfig.modelName,
     });
+    setIsEditingConfigs(false);
+  };
+
+  const handleMoveConfig = (configId: string, direction: 'up' | 'down') => {
+    const configs = [...(settings.customAiConfigs || [])];
+    const index = configs.findIndex(c => c.id === configId);
+    if (index === -1) return;
+    if (direction === 'up' && index > 0) {
+      [configs[index - 1], configs[index]] = [configs[index], configs[index - 1]];
+    } else if (direction === 'down' && index < configs.length - 1) {
+      [configs[index + 1], configs[index]] = [configs[index], configs[index + 1]];
+    } else {
+      return;
+    }
+    updateSettings({ ...settings, customAiConfigs: configs });
   };
 
   const handleSaveCurrentToConfig = (configId: string) => {
@@ -237,10 +278,13 @@ export default function Settings({ settings, onSettingsChange }: SettingsProps) 
                   </button>
                   <button 
                     onClick={() => {
-                      if (!settings.customAiConfigs?.length) {
-                        handleAddCustomConfig();
+                      const existingId = settings.customAiConfigs?.length 
+                        ? (settings.selectedCustomConfigId || settings.customAiConfigs[0].id) 
+                        : '';
+                      if (existingId) {
+                        handleSelectConfig(existingId);
                       } else {
-                        handleSelectConfig(settings.selectedCustomConfigId || settings.customAiConfigs[0].id);
+                        updateSettings({ ...settings, useCustomConfig: true, selectedCustomConfigId: '' });
                       }
                     }}
                     className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${settings.useCustomConfig ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -290,55 +334,87 @@ export default function Settings({ settings, onSettingsChange }: SettingsProps) 
                           <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">选择配置方案</Label>
                           <Button 
                             variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 rounded-md text-primary hover:bg-primary/10"
-                            onClick={handleAddCustomConfig}
+                            size="sm" 
+                            className={`h-7 text-[10px] rounded-lg transition-all ${isEditingConfigs ? 'bg-primary/10 text-primary font-bold' : 'text-muted-foreground hover:text-primary'}`}
+                            onClick={() => setIsEditingConfigs(!isEditingConfigs)}
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Settings2 className="w-3 h-3 mr-1" />
+                            {isEditingConfigs ? '完成' : '编辑'}
                           </Button>
                         </div>
                         
-                        <div className="flex gap-2">
-                          <div className="flex-grow">
-                            <Select 
-                              value={settings.selectedCustomConfigId || ''} 
-                              onValueChange={handleSelectConfig}
-                            >
-                              <SelectTrigger className="h-11 bg-background/40 border-border/40 rounded-xl">
-                                <SelectValue placeholder="选择自定义配置" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {settings.customAiConfigs?.map(config => (
-                                  <SelectItem key={config.id} value={config.id}>{config.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        {settings.customAiConfigs && settings.customAiConfigs.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {settings.customAiConfigs.map((config, idx) => {
+                              const isSelected = settings.selectedCustomConfigId === config.id;
+                              return (
+                                <div key={config.id} className="relative group">
+                                  <button
+                                    onClick={() => handleSelectConfig(config.id)}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
+                                      isSelected 
+                                        ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
+                                        : 'bg-background/40 border-border/40 hover:border-primary/30 text-foreground'
+                                    }`}
+                                  >
+                                    <span>{config.name}</span>
+                                    {isEditingConfigs && (
+                                      <span className="text-[8px] opacity-60 ml-0.5">#{idx + 1}</span>
+                                    )}
+                                  </button>
+                                  {isEditingConfigs && (
+                                    <div className="absolute -top-2 -right-2 flex gap-0.5 bg-popover border border-border/50 rounded-lg p-0.5 shadow-md z-10 animate-in fade-in zoom-in duration-150">
+                                      <button
+                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30"
+                                        disabled={idx === 0}
+                                        onClick={() => handleMoveConfig(config.id, 'up')}
+                                      >
+                                        <ArrowUp className="w-2.5 h-2.5" />
+                                      </button>
+                                      <button
+                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30"
+                                        disabled={idx === settings.customAiConfigs!.length - 1}
+                                        onClick={() => handleMoveConfig(config.id, 'down')}
+                                      >
+                                        <ArrowDown className="w-2.5 h-2.5" />
+                                      </button>
+                                      <button
+                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => handleDeleteConfig(config.id)}
+                                      >
+                                        <Trash2 className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                          {settings.selectedCustomConfigId && (
-                            <div className="flex gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-11 w-11 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5"
-                                onClick={() => handleDuplicateConfig(settings.selectedCustomConfigId!)}
-                              >
-                                <Copy className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-11 w-11 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                                onClick={() => handleDeleteConfig(settings.selectedCustomConfigId!)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                        ) : (
+                          <div className="text-center py-4 bg-muted/10 rounded-xl border border-dashed border-border/50 text-[10px] text-muted-foreground">
+                            暂无配置方案，请填写下方接口信息后保存
+                          </div>
+                        )}
                       </div>
 
-                      {settings.selectedCustomConfigId && (
-                        <div className="space-y-4 pt-1">
+                      <div className="space-y-4 pt-1">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground ml-1">快速预设</Label>
+                          <Select value="" onValueChange={handleApplyPreset}>
+                            <SelectTrigger className="h-11 bg-background/40 border-border/40 rounded-xl">
+                              <SelectValue placeholder="选择一个预设自动填入接口信息..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {AI_PRESETS.map(preset => (
+                                <SelectItem key={preset.id} value={preset.id}>
+                                  {preset.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {settings.selectedCustomConfigId && (
                           <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-muted-foreground ml-1">方案名称</Label>
                             <Input 
@@ -348,49 +424,48 @@ export default function Settings({ settings, onSettingsChange }: SettingsProps) 
                               className="h-11 bg-background/40 border-border/40 rounded-xl"
                             />
                           </div>
+                        )}
 
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-muted-foreground ml-1">AI 接口 Base URL</Label>
-                            <Input 
-                              type="text"
-                              placeholder="https://your-api.com/v1"
-                              className="h-11 bg-background/40 border-border/40 rounded-xl"
-                              value={settings.aiBaseUrl || ''}
-                              onChange={(e) => updateSettings({ ...settings, aiBaseUrl: e.target.value })}
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-muted-foreground ml-1">API Key</Label>
-                            <Input 
-                              type="password"
-                              placeholder="sk-..."
-                              className="h-11 bg-background/40 border-border/40 rounded-xl"
-                              value={settings.aiApiKey || ''}
-                              onChange={(e) => updateSettings({ ...settings, aiApiKey: e.target.value })}
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-muted-foreground ml-1">模型名称</Label>
-                            <Input 
-                              type="text"
-                              placeholder="如: gpt-3.5-turbo..."
-                              className="h-11 bg-background/40 border-border/40 rounded-xl"
-                              value={settings.aiModelName || ''}
-                              onChange={(e) => updateSettings({ ...settings, aiModelName: e.target.value })}
-                            />
-                          </div>
-
-                          <Button 
-                            className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
-                            onClick={() => handleSaveCurrentToConfig(settings.selectedCustomConfigId!)}
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            同步保存至当前方案
-                          </Button>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground ml-1">AI 接口 Base URL</Label>
+                          <Input 
+                            type="text"
+                            placeholder="https://your-api.com/v1"
+                            className="h-11 bg-background/40 border-border/40 rounded-xl"
+                            value={settings.aiBaseUrl || ''}
+                            onChange={(e) => updateSettings({ ...settings, aiBaseUrl: e.target.value })}
+                          />
                         </div>
-                      )}
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground ml-1">API Key</Label>
+                          <Input 
+                            type="password"
+                            placeholder="sk-..."
+                            className="h-11 bg-background/40 border-border/40 rounded-xl"
+                            value={settings.aiApiKey || ''}
+                            onChange={(e) => updateSettings({ ...settings, aiApiKey: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground ml-1">模型名称</Label>
+                          <Input 
+                            type="text"
+                            placeholder="如: gpt-3.5-turbo..."
+                            className="h-11 bg-background/40 border-border/40 rounded-xl"
+                            value={settings.aiModelName || ''}
+                            onChange={(e) => updateSettings({ ...settings, aiModelName: e.target.value })}
+                          />
+                        </div>
+
+                        <Button 
+                          className="w-full h-11 bg-primary hover:bg-accent text-primary-foreground rounded-xl gap-2 text-sm font-medium"
+                          onClick={handleAddCustomConfig}
+                        >
+                          <Save className="w-4 h-4" /> 保存为新方案
+                        </Button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -107,7 +107,7 @@ function safeJSONParse(text: string) {
     const parsed = JSON.parse(text);
     return parsed;
   } catch (e) {
-    // 灏濊瘯浠?markdown 浠ｇ爜鍧椾腑鎻愬彇
+    // 尝试从 markdown 代码块中提取
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     let targetText = text;
     if (jsonMatch && jsonMatch[1]) {
@@ -117,7 +117,8 @@ function safeJSONParse(text: string) {
       } catch (e2) {}
     }
 
-    // 灏濊瘯鎴彇绗竴涓?{ 鍒版渶鍚庝竴涓?} 涔嬮棿鐨勫唴瀹?    const firstBrace = targetText.indexOf('{');
+    // 尝试截取第一个 { 到最后一个 } 之间的内容
+    const firstBrace = targetText.indexOf('{');
     const firstBracket = targetText.indexOf('[');
     
     let startIdx = firstBrace;
@@ -139,12 +140,12 @@ function safeJSONParse(text: string) {
     }
 
     console.error('Failed to parse JSON string:', text);
-    throw new Error('Unable to parse AI response JSON.');
+    throw new Error('无法解析 AI 返回的 JSON 数据。');
   }
 }
 
 function splitIntoChunks(text: string, maxLength: number): string[] {
-  const sentences = text.match(/[^銆傦紒锛?!?\n]+[銆傦紒锛?!?\n]*/g) || [text];
+  const sentences = text.match(/[^。！？.!?\n]+[。！？.!?\n]*/g) || [text];
   const chunks: string[] = [];
   let currentChunk = '';
 
@@ -217,16 +218,16 @@ async function handleError(response: Response) {
   }
 
   if (response.status === 403) {
-    return new Error(`閭€璇风爜閿欒: 璇峰墠寰€璁剧疆妫€鏌ユ殫鍙锋槸鍚︽纭?(${response.status})`);
+    return new Error(`邀请码错误: 请前往设置检查暗号是否正确 (${response.status})`);
   } else if (response.status === 400) {
-    return new Error(`閰嶇疆閿欒: ${errorDetail} (${response.status})`);
+    return new Error(`配置错误: ${errorDetail} (${response.status})`);
   } else if (response.status === 401) {
-    return new Error(`Authentication failed: invalid API Key (${response.status})`);
+    return new Error(`鉴权失败: API Key 无效 (${response.status})`);
   } else if (response.status === 404) {
     return new Error(`Endpoint not found: check whether Base URL should end at /v1 and avoid duplicating /chat/completions. (${response.status}) ${errorDetail}`);
   }
 
-  return new Error(`鏈嶅姟鍣ㄨ繛鎺ュけ璐?(${response.status}): ${errorDetail || '鏈煡閿欒'}`);
+  return new Error(`服务器连接失败 (${response.status}): ${errorDetail || '未知错误'}`);
 }
 
 export async function analyzeReleaseText(
@@ -234,17 +235,25 @@ export async function analyzeReleaseText(
   onProgress?: (data: any) => void,
   options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
 ) {
-  const prompt = `瀵煎笀鎸囦护锛氬垎鏋愭枃鏈苟鎷嗗垎涓洪噴鏀炬竻鍗曘€?    杈撳叆锛?${text}
-    瑕佹眰锛?    1. 銆愭瀬鑷磋鐩栥€戯細蹇呴』澶勭悊杈撳叆鏂囨湰鐨勬墍鏈夋牳蹇冭鐐广€傚嵆浣挎枃鏈緝闀匡紝涔熻纭繚璇嗗埆鍑哄叾涓瘡涓€涓嫭绔嬬殑鎯呯华瑙﹀彂鐐规垨浜嬩欢锛屼笉瑕侀殢鎰忓悎骞舵垨鐪佺暐锛屽鏋滄槸澶氬彞璇濓紝璇烽€愬彞娣卞害鎷嗚В锛屽姟蹇呬繚璇侀噴鏀剧殑鍏ㄩ潰鎬€銆?    2. 娣卞害鍓栨瀽锛氭寲鎺樻瘡椤硅儗鍚庣殑搴曞眰鎯宠锛堟兂瑕佽璁ゅ彲銆佹兂瑕佹帶鍒躲€佹兂瑕佸畨鍏級锛屾彮绀鸿繖浜涘姩鍔涚殑杩愪綔鏂瑰紡銆?    3. 鈥滄兂瑕佲€濅粎闄?[approval, control, security]銆?    4. 姣忛」鐨勮В鏋愶紙a锛夊簲绾?0瀛楀乏鍙筹紝鐩村嚮鏍稿績銆?    5. 鍒嗘瀽鎬荤粨锛坅na锛夛細瀵规暣浣撹繘琛屾繁搴︽彁鐐硷紝绾?0瀛椼€?    
-    杈撳嚭蹇呴』鏄函JSON鏍煎紡锛?    {
+  const prompt = `导师指令：分析文本并拆分为释放清单。
+    输入：${text}
+    要求：
+    1. 【极致覆盖】：必须处理输入文本的所有核心要点。即使文本较长，也要确保识别出其中每一个独立的情绪触发点或事件，不要随意合并或省略，如果是多句话，请逐句深度拆解，务必保证释放的全面性。
+    2. 【关键：叙事者视角】：用户是叙事的"我"。文中描述"别人做了某事"时，拆出来的句子必须保留"别人"这个主语，不能把别人的行为写成用户自己的行为。分析的对象始终是"用户面对这些事时内心的想要"，而不是"用户做了什么事"。例如原文"室友熬夜外放"，原始句子应写成"室友熬夜外放打游戏吵到我"，分析应为"渴望安静环境被尊重却得不到，触发想要控制的念头"——绝对不能写成"自己做错了什么"。
+    3. 深度剖析：挖掘每项背后用户自身的底层想要（想要被认可、想要控制、想要安全），揭示这些动力的运作方式。
+    4. "想要"仅限 [approval, control, security]。
+    5. 每项的解析（a）应约30-50字，直击核心。
+    6. 分析总结（ana）：对整体进行深度提炼，约50字。
+
+    输出必须是纯JSON格式：
+    {
       "list": [
-        { "s": "鍘熷鍙ュ瓙", "w": ["approval"], "a": "娼滄剰璇嗘寲鎺樺垎鏋?, "phase": "涓婚鍒囧叆鐐? }
+        { "s": "原始句子", "w": ["approval"], "a": "潜意识挖掘分析", "phase": "主题切入点" }
       ],
-      "ana": "鍒嗘瀽鎬荤粨鍐呭"
+      "ana": "分析总结内容"
     }`;
 
   try {
-    // Wait for the full non-streaming AI response before parsing.
     const responseText = await callAI(prompt, undefined, options);
     const result = safeJSONParse(responseText || '');
     if (onProgress) onProgress(result);
@@ -260,19 +269,30 @@ export async function analyzeAIGen(
   onProgress?: (data: any) => void,
   options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
 ) {
-  const prompt = `浣犳槸涓€浣嶇簿閫氬湥澶氱撼閲婃斁娉曚笌鏄惧寲娉曞垯鐨勬暀缁冦€?    浠诲姟锛氭繁搴﹀墫鏋愪互涓嬫枃鏈墖娈碉紝鍍忓墺娲嬭懕涓€鏍锋媶瑙ｇ棝鐐广€?
-    杈撳叆鏂囨湰鍐呭锛?${text}
-    
-    Logic (鍏ㄦ伅閲婃斁閫昏緫 - 閽堝璇ョ墖娈佃瘑鍒嚭鐨勫叿浣撲簨浠?鎯呭喌锛岄兘闇€鎵ц浠ヤ笅5灞傜粨鏋?:
-    1. 閽堝浜嬩欢姝ｅ弽闈㈢殑鍏佽 (鐢熸垚3-4鍙?锛氥€愮粷瀵逛笉瑕佺偣鍑哄叿浣撴儏缁紝鑰屾槸閲嶇偣閲婃斁鍦ㄤ簨浠?鎯呭喌鏈韩銆戙€傜敓鎴愬厑璁歌鎯呭喌瀛樺湪銆佷互鍙婂厑璁稿叾鍙嶉潰鎯呭喌瀛樺湪鐨勯棶鍙ャ€備緥濡傦細鈥滀綘鍏佽鍒汉蹇借浣犲悧锛熲€濄€佲€滀綘鍏佽鍒汉涓嶅拷瑙嗕綘鍚楋紵鈥濄€傚甫鍒版儏缁椂鍙鈥滀綘鍏佽杩欑鎰熻瀛樺湪鍚楋紵鈥濄€?    2. 娓呯悊鎵х潃闈?(鐢熸垚1鍙?锛氬紩瀵煎療瑙夊褰撳墠浜嬩欢鈥滄兂瑕佹敼鍙樺畠鈥濇垨鈥滄帹寮€瀹冣€濈殑娓存眰銆?    3. 鎸栨帢娣卞眰鍔ㄦ満 (鐢熸垚1鍙?锛氭寚鍑洪殣钘忕殑鍖箯闇€姹傦紙鎯宠鎺у埗銆佽鍚屾垨瀹夊叏锛夛紝寮曞鏀句笅銆?    4. 瀵圭珛铻嶅悎 (鐢熸垚1鍙?锛氬厑璁镐簨浠跺彂鐢熶笌涓嶅彂鐢熷苟瀛橈紝瀵熻閮芥槸鑳介噺銆?    5. 缁堟瀬閲婃斁涓庡瓨鍦?(鐢熸垚1鍙?锛氣€滀綘鑳芥妸瀹冩斁涓嬪悧锛熲€濈粓鏋佹竻鐞嗐€?    
-    瑕佹眰锛?    1. 銆愭瀬鑷村叏闈€戯細鍙璇ョ墖娈垫湁澶氫釜灞傞潰鎴栧涓彞瀛愶紝灏卞繀椤婚€愪釜鐥涚偣/鍙ュ瓙寰幆浜у嚭涓婅堪闂彞锛佹妸鏂囦腑鎻愬埌鐨勬瘡涓€涓牳蹇冪煕鐩?鍏蜂綋浜嬩欢缁嗙粏鎷嗚В锛屼负瀹冧滑鍒嗗埆鐢熸垚杩炵画娣卞叆鐨勪笂杩伴噴鏀鹃棶鍙ラ摼銆備笉闄愭暟閲忥紝鍔″繀鎶婄墖娈靛唴鐨勪簨浠舵斁骞插噣锛屼笉瑕佺渷鐣ワ紒
-    2. 銆愭瀬搴︾畝鏄庣煭淇冦€戯細姣忓彞闂彞蹇呴』闈炲父鐭€傚彧瑕佺函JSON锛屼笉杈撳嚭澶氫綑搴熻瘽銆?    3. 銆愬厠鍒剁殑寮曠敤銆戯細鐩存帴浣跨敤鐢ㄦ埛鐨勮瘝姹囨弿杩颁簨浠讹紝涓嶄贡鍔犳儏缁舰瀹硅瘝銆?    
-    杈撳嚭蹇呴』鏄函JSON鏍煎紡锛?    {
+  const prompt = `你是一位精通圣多纳释放法与显化法则的教练。
+    任务：深度剖析以下文本片段，像剥洋葱一样拆解痛点。
+
+    输入文本内容：${text}
+
+    Logic (全息释放逻辑 - 针对该片段识别出的具体事件/情况，都需执行以下5层结构):
+    1. 针对事件正反面的允许 (生成3-4句)：【绝对不要点出具体情绪，而是重点释放在事件/情况本身】。生成允许该情况存在、以及允许其反面情况存在的问句。例如："你允许别人忽视你吗？"、"你允许别人不忽视你吗？"。带到情绪时只说"你允许这种感觉存在吗？"。
+    2. 清理执着面 (生成1句)：引导察觉对当前事件"想要改变它"或"推开它"的渴求。
+    3. 挖掘深层动机 (生成1句)：指出隐藏的匮乏需求（想要控制、认同或安全），引导放下。
+    4. 对立融合 (生成1句)：允许事件发生与不发生并存，察觉都是能量。
+    5. 终极释放与存在 (生成1句)："你能把它放下吗？"终极清理。
+
+    要求：
+    1. 【极致全面】：只要该片段有多个层面或多个句子，就必须逐个痛点/句子循环产出上述问句！把文中提到的每一个核心矛盾/具体事件细细拆解，为它们分别生成连续深入的上述释放问句链。不限数量，务必把片段内的事件放干净，不要省略！
+    2. 【极度简明短促】：每句问句必须非常短。只要纯JSON，不输出多余废话。
+    3. 【克制的引用】：直接使用用户的词汇描述事件，不乱加情绪形容词。
+
+    输出必须是纯JSON格式：
+    {
       "list": [
-        { 
-          "s": "鐢熸垚鐨勫叿浣撻噴鏀鹃棶鍙ュ唴瀹?, 
+        {
+          "s": "生成的具体释放问句内容",
           "w": ["control", "approval", "security"],
-          "phase": "涓婚鍒囧叆鐐?- 姝ラ鍚嶇О" 
+          "phase": "主题切入点 - 步骤名称"
         }
       ]
     }`;
@@ -293,17 +313,26 @@ export async function generateCustomAreaQuestions(
   onProgress?: (data: any) => void,
   options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
 ) {
-  const prompt = `瀵煎笀鎸囦护锛氭牴鎹敤鎴疯緭鍏ョ殑鈥滈鍩?涓婚鈥濓紝鐢熸垚涓€濂椾笓灞炶棰嗗煙鐨勬繁灞傞噴鏀鹃棶鍙ャ€?    杈撳叆涓婚锛?${topic}
-    
-    浠诲姟锛?    璇蜂负杩欎釜鐗瑰畾棰嗗煙鐢熸垚 6-8 涓拡瀵规€х殑鍦ｅ绾抽噴鏀鹃棶鍙ャ€?    
-    瑕佹眰锛?    1. 鍓?涓棶鍙ワ細鎸栨帢骞堕潰瀵硅棰嗗煙閲岀殑璐熼潰鎶楁嫆锛堜緥濡傦細鍏充簬${topic}浣犳渶鎶楁嫆/瀹虫€曠殑鏂归潰锛熷埌鐜板湪浣犵殑鎰熻鏄粈涔堬紵锛?    2. 鎺ヤ笅鏉?-3鍙ワ細鎸栨帢璇ラ鍩熻儗鍚庣殑搴曞眰鎯宠锛堟瀬鍔涙帰璁ㄨ繖娈靛叧绯?杩欎欢浜嬭窡鈥滄兂瑕佹帶鍒垛€濄€佲€滄兂瑕佽璁ゅ悓鈥濄€佲€滄兂瑕佸畨鍏ㄢ€濇湁浠€涔堝叧鑱旓紵浣犵殑鎰熻鏄粈涔堬紵锛?    3. 鎺ヤ笅鏉?-2鍙ワ細鏋佺鐨勬兂璞★紙濡傛灉鏄渶鍧忕粨灞€/濡傛灉宸茬粡闈炲父瀹岀編锛屼綘鐜板湪鐨勬劅瑙夋槸浠€涔堬紵锛?    4. 鏈€鍚?鍙ワ細鍖呭涓庡厑璁革紙浣犺兘鍏佽褰撳墠瀵?${topic}鐨勪竴鍒囩幇鐘跺悧锛燂級
-    
-    鏋佸害閲嶈锛氬彞寮忓敖閲忕粨灏惧甫涓娾€滄垜鐜板湪瀵瑰畠鐨勬劅瑙夋槸浠€涔堬紵鈥濇垨鈥滀綘鐜板湪瀵规鐨勬劅瑙夋槸浠€涔堬紵鈥濓紝鐩存帴閽堝浜嬩欢瀵硅薄銆?    璇风洿鎺ヨ繑鍥炰竴涓瓧绗︿覆鏁扮粍鐨凧SON锛佷笉瑕佹湁澶氫綑鐨勮В鏋愬拰瀵掓殑锛?    
-    杈撳嚭绾疛SON:
+  const prompt = `导师指令：根据用户输入的"领域/主题"，生成一套专属该领域的深层释放问句。
+    输入主题：${topic}
+
+    任务：
+    请为这个特定领域生成 6-8 个针对性的圣多纳释放问句。
+
+    要求：
+    1. 前2个问句：挖掘并面对该领域里的负面抗拒（例如：关于${topic}你最抗拒/害怕的方面？到现在你的感觉是什么？）
+    2. 接下来2-3句：挖掘该领域背后的底层想要（极力探讨这段关系/这件事跟"想要控制"、"想要被认同"、"想要安全"有什么关联？你的感觉是什么？）
+    3. 接下来1-2句：极端的想象（如果是最坏结局/如果已经非常完美，你现在的感觉是什么？）
+    4. 最后1句：包容与允许（你能允许当前对${topic}的一切现状吗？）
+
+    极度重要：句式尽量结尾带上"我现在对它的感觉是什么？"或"你现在对此的感觉是什么？"，直接针对事件对象。
+    请直接返回一个字符串数组的JSON！不要有多余的解析和寒暄！
+
+    输出纯JSON:
     {
       "questions": [
-        "闂彞鍐呭1",
-        "闂彞鍐呭2"
+        "问句内容1",
+        "问句内容2"
       ]
     }`;
 
@@ -325,22 +354,31 @@ export async function analyzeAreaAnswers(
 
   const historyContext =
     options?.history && options.history.length > 0
-      ? `\n鍘嗗彶瑙ｆ瀽鑳屾櫙锛堜緵鍙傝€冿紝璇风粨鍚堣繖浜涘巻鍙叉礊瀵熻繘琛屾洿娣变竴灞傜殑杩涢樁鎸栨帢锛夛細\n${options.history
-          .map(h => `[杞:${h.round || 1}] 闂?${h.q} 绛?${h.ans} 瑙ｆ瀽:${h.a}`)
+      ? `\n历史解析背景（仅供参考，请结合这些历史洞见进行更深一层的进阶挖掘）：\n${options.history
+          .map(h => `[轮次:${h.round || 1}] 问:${h.q} 答:${h.ans} 解析:${h.a}`)
           .join('\n')}`
       : '';
 
-  const prompt = `瀵煎笀鎸囦护锛氭繁搴﹀垎鏋愨€?${area}鈥?    ${historyContext}
-    
-    鏈鏂扮殑鍥炵瓟瀵圭収锛?    ${answeredQuestions.map((q, i) => `Q:${q}\nA:${answeredAnswers[i]}`).join('\n')}
-    
-    瑕佹眰锛?    鑻ュ洖绛旇緝涓哄啑闀挎垨閲嶅锛岃鎻愮偧骞跺悎骞讹紝浠ユ彁楂樺垎鏋愭晥鐜囥€?    鍒嗘瀽鐒︾偣锛氭寲鎺樻瘡涓洖绛旇儗鍚庨殣钘忕殑搴曞眰鎯宠锛堟兂瑕佽璁ゅ彲銆佹兂瑕佹帶鍒躲€佹兂瑕佸畨鍏級锛屾彮绀鸿繖浜涙兂瑕佸浣曢┍鍔ㄤ簡褰撳墠鐨勫洖搴斻€傚悓鏃讹紝濡傛灉鎻愪緵浜嗗巻鍙茶儗鏅紝璇峰姟蹇呭湪鍘熸湁瑙ｆ瀽鍩虹涓婅繘琛屸€滆繘闃垛€濇寲鎺橈紝涓嶈鍙槸閲嶅銆?    鈥滄兂瑕佲€濅粎闄?[approval, control, security]銆?    姣忎釜鍥炵瓟鐨勮В鏋愶紙a锛夊簲绾?5瀛楀乏鍙炽€?    鍒嗘瀽鎬荤粨锛坰um锛夛細缁撳悎鏁翠綋鍥炵瓟浠ュ強鍘嗗彶鎸栨帢鑳屾櫙锛屽搴曞眰鎯宠杩涜娣卞害鎬荤粨锛岀害50瀛椼€?    
-    杈撳嚭蹇呴』鏄函JSON鏍煎紡锛?    {
+  const prompt = `导师指令：深度分析"${area}"
+    ${historyContext}
+
+    本次新的回答对照：
+    ${answeredQuestions.map((q, i) => `Q:${q}\nA:${answeredAnswers[i]}`).join('\n')}
+
+    要求：
+    若回答较为冗长或重复，请提炼并合并，以提高分析效率。
+    分析焦点：挖掘每个回答背后用户自身隐藏的底层想要（想要被认可、想要控制、想要安全），揭示这些想要如何驱动了当前的回应。若回答中描述了"别人的行为"，分析对象始终是用户面对这些行为时的内在想要，绝不能把别人的行为归到用户身上。同时，如果提供了历史背景，请务必在原有解析基础上进行"进阶"挖掘，不要只是重复。
+    "想要"仅限 [approval, control, security]。
+    每个回答的s字段必须保留用户原始答句（直接引用，不要改写）。每个回答的解析（a）应约30-50字。
+    分析总结（sum）：结合整体回答以及历史挖掘背景，对底层想要进行深度总结，约50字。
+
+    输出必须是纯JSON格式：
+    {
       "list": [
-        { "q": "瀵瑰簲鐨勯棶棰樺唴瀹?, "s": "瀵瑰簲鐨勫洖绛旇繘琛屾繁搴︽彁鐐?鍚堝苟锛堢害50瀛楋級", "w": ["approval"], "a": "娼滄剰璇嗘兂瑕佹繁搴﹀垎鏋? }
+        { "q": "对应的问题内容", "s": "直接引用用户的原始答句", "w": ["approval"], "a": "潜意识想要深度分析（30-50字）" }
       ],
-      "w": ["鏍稿績鎯宠"],
-      "sum": "鍒嗘瀽鎬荤粨鍐呭"
+      "w": ["核心想要"],
+      "sum": "分析总结内容"
     }`;
 
   const responseText = await callAI(prompt, undefined, options);
@@ -349,18 +387,65 @@ export async function analyzeAreaAnswers(
   return result;
 }
 
+export async function generateDeepExploreQuestions(
+  area: string,
+  previousQA: { q: string; a: string; analysis?: string; wants?: string[] }[],
+  round: number,
+  onProgress?: (data: any) => void,
+  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
+) {
+  const qaText = previousQA.map((item, i) => 
+    `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.a || '(未回答)'}\n解析${i + 1}: ${item.analysis || '(无)'}`
+  ).join('\n\n');
+
+  const prompt = `导师指令：根据用户第${round - 1}轮的问答记录，生成第${round}轮更深入的释放问句。
+    领域：${area}
+    这是第${round}轮深度探索。
+
+    上一轮问答记录：
+    ${qaText}
+
+    任务：
+    请基于上一轮的回答和解析，生成6-8个更具穿透力的圣多纳释放问句。新问句应该比上一轮更深一层——不再停留在表面，而是直击问题背后的核心无意识模式。
+
+    要求：
+    1. 递进挖掘：基于上一轮的底层想要分析，针对性地生成更深的问题。例如如果上一轮发现了"想要控制"的模式，本轮就要问这个控制欲的根源。
+    2. 不拘泥于原问题：可以重新组织语言，用更尖锐的角度切入。
+    3. 句式简练短促：每句约15-30字。
+    4. 结尾尽量带上"我现在对它的感觉是什么？"或"你对这的感觉是什么？"
+    5. 覆盖全面：同时涵盖恐惧面、贪恋面和允许面。
+
+    请直接返回一个字符串数组的JSON！
+
+    输出纯JSON:
+    {
+      "questions": [
+        "问句内容1",
+        "问句内容2"
+      ]
+    }`;
+
+  const responseText = await callAI(prompt, undefined, options);
+  const result = safeJSONParse(responseText || '');
+  return result?.questions || [];
+}
+
 export async function analyzeEmotions(
   text: string,
   onProgress?: (data: any) => void,
   options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
 ) {
-  const prompt = `瀵煎笀鎸囦护锛氬垎鏋愭儏缁被鍒笌鏍规簮鎯宠銆?    杈撳叆锛?${text}
-    绫诲埆锛歔涓囧康淇辩伆, 鎮茶嫤, 鎭愭儳, 璐眰, 鎰ゆ€? 鑷皧鑷偛, 鏃犵晱, 鎺ョ撼, 骞冲拰]
-    瑕佹眰锛?    1. 娣卞害鍒嗘瀽鑳屽悗鐨勫績鐞嗗姩鏈哄拰鎯宠锛屾帶鍒跺湪80瀛楀乏鍙炽€?    
-    杈撳嚭蹇呴』鏄函JSON鏍煎紡锛?    {
-      "emo": ["鍏蜂綋鎯呯华"],
-      "cat": ["鎯呯华绫诲埆"],
-      "ana": "搴曞眰鎯宠涓庢牴婧愬垎鏋?
+  const prompt = `导师指令：分析情绪类别与根源想要。
+    输入：${text}
+    类别：[万念俱灰, 悲苦, 恐惧, 贪求, 愤怒, 自尊自傲, 无畏, 接纳, 平和]
+    要求：
+    1. 深度分析背后的心理动机和想要，控制在50字左右。
+
+    输出必须是纯JSON格式：
+    {
+      "emo": ["具体情绪"],
+      "cat": ["情绪类别"],
+      "ana": "底层想要与根源分析"
     }`;
 
   const responseText = await callAI(prompt, undefined, options);

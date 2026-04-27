@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { AppSettings, saveRecord, addStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, WantType, getAreaSessions, saveAreaSession, deleteAreaSession, AreaSession, CustomArea, getCustomAreas, saveCustomArea, deleteCustomArea, saveCustomAreas } from '@/lib/store';
-import { analyzeAreaAnswers, callAI, generateCustomAreaQuestions } from '@/services/geminiService';
+import { analyzeAreaAnswers, callAI, generateCustomAreaQuestions, generateDeepExploreQuestions } from '@/services/geminiService';
 import { Loader2, ChevronRight, ChevronLeft, CheckCircle2, RefreshCcw, X, LogOut, Save, Zap, Plus, Calendar, Trash2, History, ArrowRight, FileText, Circle, CheckCircle, StickyNote, Settings2, Target, ArrowUp, ArrowDown, Mic } from 'lucide-react';
 import { VoiceInput } from './VoiceInput';
 import { motion, AnimatePresence } from 'motion/react';
@@ -106,7 +106,7 @@ export default function AreaRelease({ settings }: { settings?: AppSettings }) {
   const [answers, setAnswers] = useState<string[]>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.answers || []);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.analysis || null);
-  const [step, setStep] = useState<'list' | 'area_history' | 'questions' | 'analysis' | 'release' | 'history'>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.step || 'list');
+  const [step, setStep] = useState<'list' | 'area_history' | 'questions' | 'deep_questions' | 'analysis' | 'release' | 'history'>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.step || 'list');
   const [releaseIndex, setReleaseIndex] = useState(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.releaseIndex || 0);
   const [sixStepIndex, setSixStepIndex] = useState(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.sixStepIndex || 0);
   const [sessions, setSessions] = useState<AreaSession[]>([]);
@@ -116,6 +116,13 @@ export default function AreaRelease({ settings }: { settings?: AppSettings }) {
   const [selectedTemplateForCustom, setSelectedTemplateForCustom] = useState<string>('');
   const [currentSession, setCurrentSession] = useState<AreaSession | null>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.currentSession || null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [deepExploreProjectId, setDeepExploreProjectId] = useState<string | null>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.deepExploreProjectId || null);
+  const [deepExploreRound, setDeepExploreRound] = useState<number>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.deepExploreRound || 0);
+  const [deepExploreQuestions, setDeepExploreQuestions] = useState<string[]>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.deepExploreQuestions || []);
+  const [isDeepExploring, setIsDeepExploring] = useState(false);
+  const [swipedCardId, setSwipedCardId] = useState<string | null>(null);
+  const swipeStartX = useRef(0);
+  const swipeCurrentX = useRef(0);
   const [prevStepWasNegative, setPrevStepWasNegative] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [longPressArea, setLongPressArea] = useState<any | null>(null);
@@ -154,6 +161,7 @@ export default function AreaRelease({ settings }: { settings?: AppSettings }) {
     saveCustomArea(newArea);
     setCustomAreas(getCustomAreas());
     setIsCustomAreaDialogOpen(false);
+    setIsEditMode(false);
     setTimeout(() => {
       setEditingCustomArea(null);
     }, 300); // 延迟清理以防退出动画时崩溃
@@ -289,6 +297,27 @@ const PREDEFINED_TEMPLATES = [
         ? prev.filter(i => i.id !== id) 
         : [...prev, { id, timestamp: Date.now() }]
     );
+      setSwipedCardId(null);
+  };
+
+  const handleSwipeStart = (areaId: string, clientX: number) => {
+    if (isEditMode) return;
+    swipeStartX.current = clientX;
+    swipeCurrentX.current = clientX;
+    setSwipedCardId(areaId);
+  };
+
+  const handleSwipeMove = (clientX: number) => {
+    swipeCurrentX.current = clientX;
+  };
+
+  const handleSwipeEnd = (areaId: string) => {
+    const delta = swipeStartX.current - swipeCurrentX.current;
+    if (delta > 60) {
+      setSwipedCardId(areaId);
+    } else {
+      setSwipedCardId(null);
+    }
   };
 
   const allAreas = [...AREAS, ...customAreas];
@@ -398,18 +427,27 @@ const PREDEFINED_TEMPLATES = [
       releasedIndices,
       skippedIndices,
       sixStepIndex,
-      currentSession
+      currentSession,
+      deepExploreProjectId,
+      deepExploreRound,
+      deepExploreQuestions
     });
-  }, [selectedArea, answers, analysis, step, releaseIndex, releasedIndices, skippedIndices, sixStepIndex, currentSession]);
+  }, [selectedArea, answers, analysis, step, releaseIndex, releasedIndices, skippedIndices, sixStepIndex, currentSession, deepExploreProjectId, deepExploreRound, deepExploreQuestions]);
 
   const startArea = (area: any) => {
     setSelectedArea(area);
     setStep('area_history');
     setCurrentSession(null);
+    setDeepExploreProjectId(null);
+    setDeepExploreRound(0);
+    setDeepExploreQuestions([]);
   };
 
   const startNewAnalysis = () => {
     if (!selectedArea) return;
+    setDeepExploreProjectId(null);
+    setDeepExploreRound(0);
+    setDeepExploreQuestions([]);
     setAnswers(new Array(selectedArea.questions.length).fill(''));
     setStep('questions');
     setCurrentSession(null);
@@ -428,6 +466,10 @@ const PREDEFINED_TEMPLATES = [
     setReleaseIndex(0);
     setSixStepIndex(0);
     setStep('analysis');
+    if (session.projectId) {
+      setDeepExploreProjectId(session.projectId);
+      setDeepExploreRound(session.round || 1);
+    }
   };
 
   const deleteSession = (e: React.MouseEvent, id: string) => {
@@ -497,12 +539,19 @@ const PREDEFINED_TEMPLATES = [
       
       setAnalysis(result);
       
+      // Generate projectId for the first round of deep exploration
+      const projectId = crypto.randomUUID();
+      setDeepExploreProjectId(projectId);
+      setDeepExploreRound(1);
+      
       // Create new area session
       const newSession = saveAreaSession({
         areaId: selectedArea.id,
         name: `${selectedArea.title} 领域释放`,
         list: result.list,
-        sum: result.sum
+        sum: result.sum,
+        projectId,
+        round: 1
       });
       setCurrentSession(newSession);
       setSessions(getAreaSessions());
@@ -523,6 +572,141 @@ const PREDEFINED_TEMPLATES = [
       console.error(error);
       alert(error.message || '分析失败，请检查 Worker 配置或网络');
       setStep('questions');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDeepExplore = async (session?: AreaSession) => {
+    const targetSession = session || currentSession;
+    if (!targetSession) return;
+    setIsDeepExploring(true);
+    try {
+      const previousQA = targetSession.list
+        .filter(item => item.ans || item.s)
+        .map(item => ({
+          q: item.q || '',
+          a: item.ans || item.s || '',
+          analysis: item.a || '',
+          wants: item.w || []
+        }));
+
+      const newRound = (targetSession.round || 1) + 1;
+      const newQuestions = await generateDeepExploreQuestions(
+        selectedArea.title,
+        previousQA,
+        newRound,
+        undefined,
+        {
+          model_type: settings?.selectedModel || 'MINIMAX25',
+          invite_code: settings?.inviteCode || '',
+          aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
+          aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
+          aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
+        }
+      );
+
+      if (newQuestions && newQuestions.length > 0) {
+        setDeepExploreQuestions(newQuestions);
+        setDeepExploreRound(newRound);
+        setDeepExploreProjectId(targetSession.projectId || '');
+        setCurrentSession(targetSession);
+        setAnswers(new Array(newQuestions.length).fill(''));
+        setStep('deep_questions');
+      } else {
+        alert('未能生成新的深度问句，请重试');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('深度探索生成失败，请重试');
+    } finally {
+      setIsDeepExploring(false);
+    }
+  };
+
+  const handleDeepExploreFromLatest = async () => {
+    const areaSessions = sessions
+      .filter(s => s.areaId === selectedArea.id)
+      .sort((a, b) => b.timestamp - a.timestamp);
+    if (areaSessions.length === 0) return;
+    await handleDeepExplore(areaSessions[0]);
+  };
+
+  const handleDeepAnalyze = async () => {
+    setIsAnalyzing(true);
+    setStep('analysis');
+    setAnalysis({ list: [], w: [], sum: '' });
+    setReleasedIndices([]);
+    setSkippedIndices([]);
+    setReleaseIndex(0);
+    setSixStepIndex(0);
+    try {
+      const result = await analyzeAreaAnswers(
+        selectedArea.title,
+        deepExploreQuestions,
+        answers,
+        (partial) => {
+          const answeredIndices = answers.map((a, i) => a.trim() ? i : -1).filter(i => i !== -1);
+          if (partial.list) {
+            partial.list = partial.list.map((item: any, idx: number) => {
+              const originalAnswer = answers[answeredIndices[idx]];
+              return {
+                ...item,
+                ans: originalAnswer
+              };
+            });
+          }
+          setAnalysis(partial);
+        },
+        {
+          model_type: settings?.selectedModel || 'MINIMAX25',
+          invite_code: settings?.inviteCode || '',
+          aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
+          aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
+          aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
+        }
+      );
+
+      const answeredIndices = answers.map((a, i) => a.trim() ? i : -1).filter(i => i !== -1);
+      if (result.list) {
+        result.list = result.list.map((item: any, idx: number) => {
+          const originalAnswer = answers[answeredIndices[idx]];
+          return {
+            ...item,
+            ans: originalAnswer
+          };
+        });
+      }
+
+      setAnalysis(result);
+
+      const newRound = deepExploreRound || 2;
+      const newSession = saveAreaSession({
+        areaId: selectedArea.id,
+        name: `${selectedArea.title} 深度探索 第${newRound}轮`,
+        list: result.list,
+        sum: result.sum,
+        projectId: deepExploreProjectId || '',
+        round: newRound
+      });
+      setCurrentSession(newSession);
+      setSessions(getAreaSessions());
+
+      saveRecord({
+        id: crypto.randomUUID(),
+        date: new Date().toISOString().split('T')[0],
+        type: 'area',
+        content: `${selectedArea.title} 深度探索 第${newRound}轮`,
+        analysis: {
+          list: result.list,
+          ana: result.sum
+        },
+        timestamp: Date.now()
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || '分析失败，请检查 Worker 配置或网络');
+      setStep('deep_questions');
     } finally {
       setIsAnalyzing(false);
     }
@@ -885,6 +1069,9 @@ const PREDEFINED_TEMPLATES = [
     setSixStepIndex(0);
     setPrevStepWasNegative(false);
     setCurrentSession(null);
+    setDeepExploreProjectId(null);
+    setDeepExploreRound(0);
+    setDeepExploreQuestions([]);
   };
 
   return (
@@ -917,11 +1104,35 @@ const PREDEFINED_TEMPLATES = [
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 px-1.5 md:px-2">
               {allAreas.map((area) => {
                 const isReleased = !!releasedAreaIds.find(i => i.id === area.id);
+                const isSwiped = swipedCardId === area.id;
                 return (
                   <div key={area.id} className="relative overflow-hidden rounded-xl">
+                    {!isEditMode && isSwiped && (
+                      <div className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center z-0">
+                        <Button
+                          size="sm"
+                          className={`h-full w-full rounded-xl text-xs font-bold ${isReleased ? 'bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30' : 'bg-success/90 hover:bg-success text-white'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAreaReleased(area.id, e);
+                          }}
+                        >
+                          {isReleased ? '取消' : '完成'}
+                        </Button>
+                      </div>
+                    )}
                     <Card 
-                      className={`cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all border border-border/30 bg-card/45 backdrop-blur-sm group relative`}
+                      className={`cursor-pointer hover:shadow-2xl transition-all border border-border/30 bg-card/45 backdrop-blur-sm group relative ${!isEditMode && swipedCardId !== area.id ? 'hover:scale-[1.02]' : ''}`}
+                      style={{
+                        transform: !isEditMode && swipedCardId === area.id ? 'translateX(-5rem)' : 'translateX(0)',
+                        transition: 'transform 0.2s ease',
+                        position: 'relative',
+                        zIndex: 10,
+                      }}
                       onPointerDown={(e) => {
+                        if (isEditMode) return;
+                        swipeStartX.current = e.clientX;
+                        swipeCurrentX.current = e.clientX;
                         isLongPressActive.current = false;
                         const timer = setTimeout(() => {
                           isLongPressActive.current = true;
@@ -935,12 +1146,23 @@ const PREDEFINED_TEMPLATES = [
                         window.addEventListener('pointerup', clearTimer);
                         window.addEventListener('pointermove', clearTimer);
                       }}
+                      onPointerMove={(e) => {
+                        if (isEditMode || isLongPressActive.current) return;
+                        handleSwipeMove(e.clientX);
+                      }}
+                      onPointerUp={(e) => {
+                        if (isEditMode || isLongPressActive.current) return;
+                        handleSwipeEnd(area.id);
+                      }}
                       onClick={(e) => {
                         if (isLongPressActive.current) {
                           e.preventDefault();
                           return;
                         }
-                        // Regular click starts the area if not in edit mode
+                        if (swipedCardId && swipedCardId !== area.id) {
+                          setSwipedCardId(null);
+                          return;
+                        }
                         if (!isEditMode) {
                           startArea(area);
                         }
@@ -953,8 +1175,8 @@ const PREDEFINED_TEMPLATES = [
                           </CardTitle>
                           <div className="flex items-center gap-2">
                             {isReleased && (
-                              <Badge variant="outline" className="text-[8px] h-4 px-1 border-success text-success bg-success/10 animate-in fade-in zoom-in">
-                                已释放
+                              <Badge variant="outline" className="text-[8px] h-4 px-1 border-success text-success bg-success/10">
+                                已完成
                               </Badge>
                             )}
                             <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-accent group-hover:translate-x-1 transition-all" />
@@ -1031,6 +1253,15 @@ const PREDEFINED_TEMPLATES = [
                 </Card>
               )}
             </div>
+
+            <Button
+              size="icon"
+              className={`fixed bottom-20 right-6 z-40 w-14 h-14 rounded-full shadow-2xl transition-all duration-300 ${isEditMode ? 'bg-primary text-primary-foreground rotate-90' : 'bg-card/90 backdrop-blur-md border border-border/40 text-muted-foreground hover:text-primary'}`}
+              onClick={() => setIsEditMode(!isEditMode)}
+              title={isEditMode ? '完成编辑' : '编辑模块'}
+            >
+              <Settings2 className="w-5 h-5" />
+            </Button>
           </motion.div>
         )}
 
@@ -1049,16 +1280,45 @@ const PREDEFINED_TEMPLATES = [
 
             <Card className="border-none bg-accent/5 shadow-inner">
               <CardContent className="p-6 text-center space-y-4">
-                <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <Zap className="w-8 h-8 text-accent animate-pulse" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-serif text-lg font-bold">新解析探索</h3>
-                  <p className="text-xs text-muted-foreground">通过一系列引导问句，深入解析当前在 {selectedArea.title} 方面的想要。</p>
-                </div>
-                <Button className="w-full h-12 bg-accent hover:bg-accent/80 text-white rounded-xl shadow-lg gap-2" onClick={startNewAnalysis}>
-                  <Plus className="w-5 h-5" /> 开启深度探索
-                </Button>
+                {(() => {
+                  const areaSessions = sessions
+                    .filter(s => s.areaId === selectedArea.id)
+                    .sort((a, b) => b.timestamp - a.timestamp);
+                  const hasHistory = areaSessions.length > 0;
+                  return (
+                    <>
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-sm ${hasHistory ? 'bg-primary/20' : 'bg-accent/20'}`}>
+                        <Target className={`w-8 h-8 ${hasHistory ? 'text-primary' : 'text-accent'}`} />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-serif text-lg font-bold">{hasHistory ? '继续深入探索' : '新解析探索'}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {hasHistory
+                            ? `基于最新历史记录（${areaSessions[0].name}），AI 生成更深入的释放问句。`
+                            : `通过一系列引导问句，深入解析当前在 ${selectedArea.title} 方面的想要。`}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {hasHistory && (
+                          <Button 
+                            className="w-full h-12 bg-primary hover:bg-accent text-primary-foreground rounded-xl shadow-lg gap-2 font-bold" 
+                            onClick={handleDeepExploreFromLatest}
+                            disabled={isDeepExploring}
+                          >
+                            {isDeepExploring ? <Loader2 className="animate-spin w-5 h-5" /> : <Target className="w-5 h-5" />} 继续深入
+                          </Button>
+                        )}
+                        <Button 
+                          variant="outline"
+                          className="w-full h-12 border-primary/40 text-primary hover:bg-primary/5 rounded-xl gap-2" 
+                          onClick={startNewAnalysis}
+                        >
+                          <Plus className="w-5 h-5" /> {hasHistory ? '开启新探索' : '开启深度探索'}
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 
@@ -1107,7 +1367,12 @@ const PREDEFINED_TEMPLATES = [
                                 </div>
                                 <div className="flex-grow min-w-0">
                                   <div className="flex justify-between items-start mb-1">
-                                    <h4 className="font-serif font-bold text-sm truncate">{session.name}</h4>
+                                    <h4 className="font-serif font-bold text-sm truncate flex items-center gap-2">
+                                      {session.name}
+                                      {session.round && session.round > 1 && (
+                                        <Badge variant="outline" className="text-[7px] h-4 px-1 border-accent/50 text-accent shrink-0">第{session.round}轮</Badge>
+                                      )}
+                                    </h4>
                                     <span className="text-[10px] text-muted-foreground tabular-nums">{format(session.timestamp, 'HH:mm')}</span>
                                   </div>
                                   <div className="flex items-center gap-3">
@@ -1191,7 +1456,12 @@ const PREDEFINED_TEMPLATES = [
                                 <FileText className="w-5 h-5" />
                               </div>
                               <div className="flex-grow min-w-0">
-                                <h4 className="font-serif font-bold text-sm md:text-base mb-1 truncate">{session.name}</h4>
+                                <h4 className="font-serif font-bold text-sm md:text-base mb-1 truncate flex items-center gap-2">
+                                  {session.name}
+                                  {session.round && session.round > 1 && (
+                                    <Badge variant="outline" className="text-[7px] h-4 px-1 border-accent/50 text-accent shrink-0">第{session.round}轮</Badge>
+                                  )}
+                                </h4>
                                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3 text-success" />
@@ -1272,6 +1542,68 @@ const PREDEFINED_TEMPLATES = [
                 </ScrollArea>
                 <div className="flex gap-4 mt-6">
                   <Button className="flex-1 h-12 bg-primary hover:bg-accent text-primary-foreground text-sm" onClick={handleAnalyze} disabled={isAnalyzing}>
+                    {isAnalyzing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCcw className="mr-2 w-4 h-4" />}
+                    开始释放
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {step === 'deep_questions' && (
+          <motion.div key="deep_questions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 md:space-y-6 px-1">
+            <Card className="border-none shadow-xl bg-card/80 backdrop-blur-md">
+              <CardHeader className="text-center relative py-4 px-3">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute left-1 top-2 md:left-2 rounded-full h-8 w-8"
+                  onClick={() => setStep('analysis')}
+                >
+                  <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                </Button>
+                <div className="pt-2">
+                  <Badge variant="outline" className="w-fit mx-auto mb-1 border-accent text-accent text-[8px] md:text-[10px] py-0">
+                    {selectedArea.title}领域 · 第{deepExploreRound}轮深度探索
+                  </Badge>
+                  <CardTitle className="font-serif text-lg md:text-2xl">请回答以下深入问句</CardTitle>
+                  <CardDescription className="text-[9px] md:text-xs">基于上一轮的解析，AI 生成了更深入的问题。</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="px-3 md:px-6 pb-6">
+                <ScrollArea className="h-[400px] md:h-[500px] pr-2 md:pr-4">
+                  <div className="space-y-6 py-2">
+                    {deepExploreQuestions.map((q: string, i: number) => (
+                      <div key={i} className="space-y-2 relative">
+                        <label className="text-[11px] md:text-xs font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
+                        <div className="relative">
+                          <Input 
+                            value={answers[i] || ''}
+                            onChange={(e) => {
+                              const newAnswers = [...answers];
+                              newAnswers[i] = e.target.value;
+                              setAnswers(newAnswers);
+                            }}
+                            placeholder="写下您的感受..."
+                            className="h-10 md:h-12 bg-transparent border-border/30 focus-visible:ring-accent focus-visible:bg-background/10 text-[13px] md:text-sm pr-10 backdrop-blur-sm"
+                          />
+                          {settings?.enableVoiceInput && (
+                            <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                              <VoiceInput size="sm" onResult={(voiceText) => {
+                                const newAnswers = [...answers];
+                                newAnswers[i] = (newAnswers[i] || '') + voiceText;
+                                setAnswers(newAnswers);
+                              }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                <div className="flex gap-4 mt-6">
+                  <Button className="flex-1 h-12 bg-primary hover:bg-accent text-primary-foreground text-sm" onClick={handleDeepAnalyze} disabled={isAnalyzing}>
                     {isAnalyzing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCcw className="mr-2 w-4 h-4" />}
                     开始释放
                   </Button>
@@ -1367,7 +1699,7 @@ const PREDEFINED_TEMPLATES = [
 
                         <div className="space-y-2">
                           <p className="text-[10px] md:text-xs text-muted-foreground/60 leading-tight">Q: {item.q || '问题内容正在同步...'}</p>
-                          <p className="text-[13px] md:text-sm text-foreground/90 leading-snug font-serif italic">"{item.s || item.ans || '未回答'}"</p>
+                          <p className="text-[13px] md:text-sm text-foreground/90 leading-snug font-serif italic">"{item.ans || item.s || '未回答'}"</p>
                           
                           {item.note && (
                             <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/10 flex gap-2 items-start">
@@ -1417,6 +1749,17 @@ const PREDEFINED_TEMPLATES = [
                 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
+                    className="flex-1 h-11 md:h-12 bg-primary hover:bg-accent text-primary-foreground text-xs md:text-sm font-bold shadow-md" 
+                    onClick={() => handleDeepExplore()}
+                    disabled={isDeepExploring}
+                    title="基于本轮回答，AI 生成更深入的释放问句"
+                  >
+                    {isDeepExploring ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Target className="w-4 h-4 mr-2" />} 继续深入
+                  </Button>
+                  <Button variant="secondary" className="flex-1 h-11 md:h-12 border-primary/30 hover:bg-primary/5 text-xs md:text-sm" onClick={handleManualSave}>
+                    <Save className="w-4 h-4 mr-2" /> 手动保存
+                  </Button>
+                  <Button 
                     variant="outline" 
                     className="flex-1 h-11 md:h-12 border-primary/30 hover:bg-primary/10 text-xs md:text-sm" 
                     onClick={() => {
@@ -1433,9 +1776,6 @@ const PREDEFINED_TEMPLATES = [
                     }}
                   >
                     清空并退出
-                  </Button>
-                  <Button variant="secondary" className="flex-1 h-11 md:h-12 border-accent/30 hover:bg-accent/10 text-xs md:text-sm" onClick={handleManualSave}>
-                    <Save className="w-4 h-4 mr-2" /> 手动保存
                   </Button>
                 </div>
               </CardContent>
@@ -1794,7 +2134,7 @@ const PREDEFINED_TEMPLATES = [
                   setLongPressArea(null);
                 }}
               >
-                {releasedAreaIds.find(i => i.id === longPressArea.id) ? "撤销已释放标记" : "标记为已释放"}
+                {releasedAreaIds.find(i => i.id === longPressArea.id) ? "撤销已释放标记" : "标记为已完成"}
               </Button>
             )}
           </div>
