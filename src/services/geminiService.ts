@@ -72,6 +72,10 @@ function buildWorkerRequestBody(prompt: string, options?: AIOptions) {
 
 function shouldUseLocalProxy() {
   if (typeof window === 'undefined') return false;
+  // 在GitHub Pages等静态托管环境中禁用本地代理
+  if (window.location.hostname.includes('github.io')) {
+    return false;
+  }
   return window.location.protocol === 'http:' || window.location.protocol === 'https:';
 }
 
