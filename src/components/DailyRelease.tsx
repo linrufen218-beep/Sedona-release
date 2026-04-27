@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -546,7 +546,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
                 <div className="pl-8 text-center md:text-left">
-                  <CardTitle className="text-lg md:text-xl font-serif">鍦ㄥ綋鍓嶉」鐩腑缁х画鎸栨帢</CardTitle>
+                  <CardTitle className="text-lg md:text-xl font-serif">在当前项目中继续挖掘</CardTitle>
                   <CardDescription className="text-xs md:text-sm">你可以补充更多当下的感受、拉扯或念头。</CardDescription>
                 </div>
               </CardHeader>

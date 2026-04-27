@@ -333,12 +333,12 @@ const PREDEFINED_TEMPLATES = [
     if (group && group.steps.length > 0) {
       return group.steps.map(s => s.question);
     }
-    
-    if (settings?.useDefaultQuestions !== false) {
-      return THREE_STEPS;
+
+    if (mode === 'sequential' && index === 0) {
+      return SIX_STEPS;
     }
-    
-    return THREE_STEPS; // Fallback
+
+    return THREE_STEPS;
   };
 
   const getStepContent = () => {
