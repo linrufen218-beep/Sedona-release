@@ -776,11 +776,15 @@ const PREDEFINED_TEMPLATES = [
     }
     
     setIsSentenceFinished(false);
-    if (isSequential && releaseIndex < analysis.list.length - 1) {
+    
+    // Check if there are more sentences to release
+    if (releaseIndex < analysis.list.length - 1) {
+      // Move to next sentence
       setReleaseIndex(releaseIndex + 1);
       setSixStepIndex(0);
       setActiveSteps(getEffectiveSteps(releaseIndex + 1, isSequential ? 'sequential' : 'single'));
     } else {
+      // All sentences released
       if (isSequential) {
         if (isAnalyzing) {
           setStep('analysis');
@@ -788,16 +792,10 @@ const PREDEFINED_TEMPLATES = [
           finishRelease(newReleased);
         }
       } else {
-        // Single release finished
-        if (analysis.list.length > 0 && newReleased.length + skippedIndices.length === analysis.list.length) {
-          if (isAnalyzing) {
-            setStep('analysis');
-          } else {
-            finishRelease(newReleased);
-          }
-        } else {
+        // Single release finished - all sentences done
+        if (isAnalyzing) {
           setStep('analysis');
-          // For single release, also mark as released
+        } else {
           finishRelease(newReleased);
         }
       }

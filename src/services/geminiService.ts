@@ -1,4 +1,4 @@
-﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
+﻿﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
 const LOCAL_PROXY_URL = '/api/ai-proxy';
 type AIOptions = {
   model_type?: string;

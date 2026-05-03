@@ -776,7 +776,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
               {/* Row 1: Progress (Center) & X (Right) */}
               <div className="w-full relative flex items-center justify-center">
                 <Badge variant="outline" className="px-3 md:px-4 py-1 border-accent/50 text-accent text-[10px] md:text-xs">
-                  閲婃斁杩涚▼ {currentSentenceIndex + 1} / {analysis.list.length}
+                  释放进程 {currentSentenceIndex + 1} / {analysis.list.length}
                 </Badge>
                 <Button 
                   variant="ghost" 
