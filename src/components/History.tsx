@@ -582,13 +582,36 @@ export default function History() {
                                             </div>
 
                                             <div className="space-y-1.5">
-                                              <p className="text-[16px] font-serif font-bold italic leading-relaxed text-foreground/90">
-                                                "{s.s || s.text || '解析内容中...'}"
-                                              </p>
-                                              {s.a && (
-                                                <p className="text-[11px] text-muted-foreground/80 leading-relaxed bg-accent/5 p-2 rounded-lg border border-accent/10 italic">
-                                                  {s.a}
-                                                </p>
+                                              {/* 问题 + 原句 + 解析 + 想要 格式 */}
+                                              {s.q ? (
+                                                <>
+                                                  {/* 问题 */}
+                                                  <p className="text-[12px] font-medium text-primary/80 leading-relaxed bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                                    <span className="font-bold">问题:</span> {s.q}
+                                                  </p>
+                                                  {/* 原句 */}
+                                                  <p className="text-[16px] font-serif font-bold italic leading-relaxed text-foreground/90">
+                                                    "{s.s || s.text || '解析内容中...'}"
+                                                  </p>
+                                                  {/* 解析 */}
+                                                  {s.a && (
+                                                    <p className="text-[11px] text-muted-foreground/80 leading-relaxed bg-accent/5 p-2 rounded-lg border border-accent/10 italic">
+                                                      <span className="font-bold">解析:</span> {s.a}
+                                                    </p>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <>
+                                                  {/* 普通格式：原句 + 解析 */}
+                                                  <p className="text-[16px] font-serif font-bold italic leading-relaxed text-foreground/90">
+                                                    "{s.s || s.text || '解析内容中...'}"
+                                                  </p>
+                                                  {s.a && (
+                                                    <p className="text-[11px] text-muted-foreground/80 leading-relaxed bg-accent/5 p-2 rounded-lg border border-accent/10 italic">
+                                                      {s.a}
+                                                    </p>
+                                                  )}
+                                                </>
                                               )}
                                             </div>
 

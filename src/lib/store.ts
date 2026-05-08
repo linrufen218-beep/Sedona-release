@@ -230,7 +230,26 @@ export function getHistory(): ReleaseRecord[] {
 
 export function saveRecord(record: ReleaseRecord) {
   const history = getHistory();
-  history.unshift(record);
+  
+  // 检查是否同一天同一批内容（基于日期和内容）
+  const existingIndex = history.findIndex(r => 
+    r.date === record.date && 
+    r.content === record.content && 
+    r.type === record.type
+  );
+  
+  if (existingIndex !== -1) {
+    // 同一天同一批内容：更新现有记录，保留最新的释放状态
+    history[existingIndex] = {
+      ...history[existingIndex],
+      ...record,
+      timestamp: Date.now() // 更新时间戳
+    };
+  } else {
+    // 新一天或新内容：添加新记录
+    history.unshift(record);
+  }
+  
   localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
 }
 

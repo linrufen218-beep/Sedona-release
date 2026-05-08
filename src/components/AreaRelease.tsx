@@ -101,7 +101,13 @@ const THREE_STEPS = [
   "你能释放它吗？"
 ];
 
-export default function AreaRelease({ settings }: { settings?: AppSettings }) {
+export default function AreaRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab }: { 
+  settings?: AppSettings;
+  globalIsAnalyzing: boolean;
+  setGlobalIsAnalyzing: (value: boolean) => void;
+  analyzingTab: string | null;
+  setAnalyzingTab: (value: string | null) => void;
+}) {
   const [selectedArea, setSelectedArea] = useState<any>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.selectedArea || null);
   const [answers, setAnswers] = useState<string[]>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.answers || []);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -242,14 +248,14 @@ const PREDEFINED_TEMPLATES = [
   {
     id: "sp",
     title: "特定对象 (SP)",
-    description: "释放关于特定的人（前任、暗恋对象、伴侣等）的执念与纠缠。",
+    description: "释放关于特定的人（前任、暗恋对象、伴侣等）的想要与纠缠。",
     questions: [
       "你在这段关系（或这个人身上）最抗拒面对的是什么？我现在对它的感觉是什么？",
       "你在多大程度上想控制ta的想法、行为或你们之间的走向？我现在对它的感觉是什么？",
       "你多么想要得到ta的认同或爱？我现在对此的感觉是什么？",
       "如果ta永远消失在你的生命中，彻底离开了。我觉得安全感被摧毁了吗？我现在对它的感觉是什么？",
       "想象ta现在如你所愿地疯狂爱上你。我现在对它的感觉是什么？",
-      "你能放开对这个人的执念，允许现状存在吗？"
+      "你能放开对这个人的想要，允许现状存在吗？"
     ]
   }
 ];
@@ -415,6 +421,7 @@ const PREDEFINED_TEMPLATES = [
   const [isMoreReleaseOpen, setIsMoreReleaseOpen] = useState(false);
   const [moreReleaseEmotion, setMoreReleaseEmotion] = useState('');
   const [moreReleaseWants, setMoreReleaseWants] = useState<WantType[]>([]);
+  const [filterMode, setFilterMode] = useState<'all' | 'unreleased' | 'released'>('all');
 
   // Save state on changes
   useEffect(() => {
@@ -492,6 +499,8 @@ const PREDEFINED_TEMPLATES = [
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
+    setGlobalIsAnalyzing(true);
+    setAnalyzingTab('area');
     setStep('analysis');
     setAnalysis({ list: [], w: [], sum: '' });
     setReleasedIndices([]);
@@ -561,7 +570,7 @@ const PREDEFINED_TEMPLATES = [
         id: crypto.randomUUID(),
         date: new Date().toISOString().split('T')[0],
         type: 'area',
-        content: `${selectedArea.title} 领域释放`,
+        content: `${selectedArea.title} - ${result.list.length}个释放点`,
         analysis: {
           list: result.list,
           ana: result.sum
@@ -574,6 +583,10 @@ const PREDEFINED_TEMPLATES = [
       setStep('questions');
     } finally {
       setIsAnalyzing(false);
+      if (analyzingTab === 'area') {
+        setGlobalIsAnalyzing(false);
+        setAnalyzingTab(null);
+      }
     }
   };
 
@@ -696,7 +709,7 @@ const PREDEFINED_TEMPLATES = [
         id: crypto.randomUUID(),
         date: new Date().toISOString().split('T')[0],
         type: 'area',
-        content: `${selectedArea.title} 深度探索 第${newRound}轮`,
+        content: `${selectedArea.title} 深度探索 - 第${newRound}轮 - ${result.list.length}个释放点`,
         analysis: {
           list: result.list,
           ana: result.sum
@@ -709,6 +722,10 @@ const PREDEFINED_TEMPLATES = [
       setStep('deep_questions');
     } finally {
       setIsAnalyzing(false);
+      if (analyzingTab === 'area') {
+        setGlobalIsAnalyzing(false);
+        setAnalyzingTab(null);
+      }
     }
   };
 
@@ -874,20 +891,15 @@ const PREDEFINED_TEMPLATES = [
   const skipSentence = () => {
     const newSkipped = [...skippedIndices, releaseIndex];
     setSkippedIndices(newSkipped);
+    
     if (isSequential && releaseIndex < analysis.list.length - 1) {
       setReleaseIndex(releaseIndex + 1);
       setSixStepIndex(0);
       setActiveSteps(getEffectiveSteps(releaseIndex + 1, isSequential ? 'sequential' : 'single'));
     } else {
       if (isSequential) {
-        if (isAnalyzing) {
-          setStep('analysis');
-        } else {
-          finishRelease();
-        }
-      } else {
-        // Single release finished
-        if (analysis.list.length > 0 && releasedIndices.length + newSkipped.length === analysis.list.length) {
+        const totalProcessed = new Set([...releasedIndices, ...newSkipped]).size;
+        if (analysis.list.length > 0 && totalProcessed === analysis.list.length) {
           if (isAnalyzing) {
             setStep('analysis');
           } else {
@@ -895,6 +907,26 @@ const PREDEFINED_TEMPLATES = [
           }
         } else {
           setStep('analysis');
+        }
+      } else {
+        const totalProcessed = new Set([...releasedIndices, ...newSkipped]).size;
+        if (analysis.list.length > 0 && totalProcessed === analysis.list.length) {
+          if (isAnalyzing) {
+            setStep('analysis');
+          } else {
+            finishRelease();
+          }
+        } else {
+          const nextIndex = analysis.list.findIndex((_: any, i: number) => 
+            !releasedIndices.includes(i) && !newSkipped.includes(i)
+          );
+          if (nextIndex !== -1) {
+            setReleaseIndex(nextIndex);
+            setSixStepIndex(0);
+            setActiveSteps(getEffectiveSteps(nextIndex, 'single'));
+          } else {
+            setStep('analysis');
+          }
         }
       }
     }
@@ -1007,7 +1039,7 @@ const PREDEFINED_TEMPLATES = [
         id: crypto.randomUUID(),
         date: new Date().toISOString().split('T')[0],
         type: 'area',
-        content: `${selectedArea.title} 领域释放`,
+        content: `${selectedArea.title} - ${newList.length}个释放点`,
         analysis: {
           list: newList,
           ana: analysis.sum
@@ -1048,7 +1080,7 @@ const PREDEFINED_TEMPLATES = [
       id: crypto.randomUUID(),
       date: new Date().toISOString().split('T')[0],
       type: 'area',
-      content: `${selectedArea.title} 领域释放`,
+      content: `${selectedArea.title} - ${analysis.list.length}个释放点`,
       analysis: {
         list: analysis.list,
         ana: analysis.sum
@@ -1504,7 +1536,7 @@ const PREDEFINED_TEMPLATES = [
                 <div className="pt-2">
                   <Badge variant="outline" className="w-fit mx-auto mb-1 border-accent text-accent text-[8px] md:text-[10px] py-0">{selectedArea.title}领域</Badge>
                   <CardTitle className="font-serif text-lg md:text-2xl">请回答以下引导问句</CardTitle>
-                  <CardDescription className="text-[9px] md:text-xs">您可以直接在下方填写感受，也可以留空。</CardDescription>
+                  <CardDescription className="text-[11px] md:text-sm">您可以直接在下方填写感受，也可以留空。</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="px-3 md:px-6 pb-6">
@@ -1512,7 +1544,7 @@ const PREDEFINED_TEMPLATES = [
                   <div className="space-y-6 py-2">
                     {selectedArea.questions.map((q: string, i: number) => (
                       <div key={i} className="space-y-2 relative">
-                        <label className="text-[11px] md:text-xs font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
+                        <label className="text-[15px] md:text-base font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
                         <div className="relative">
                           <Input 
                             value={answers[i]}
@@ -1522,7 +1554,7 @@ const PREDEFINED_TEMPLATES = [
                               setAnswers(newAnswers);
                             }}
                             placeholder="写下您的感受..."
-                            className="h-10 md:h-12 bg-transparent border-border/30 focus-visible:ring-accent focus-visible:bg-background/10 text-[13px] md:text-sm pr-10 backdrop-blur-sm"
+                            className="h-10 md:h-12 bg-transparent border-border/30 focus-visible:ring-accent focus-visible:bg-background/10 text-[13px] md:text-sm pr-10 backdrop-blur-sm placeholder:text-muted-foreground/70 placeholder:text-[12px]"
                           />
                           {settings?.enableVoiceInput && (
                             <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -1574,7 +1606,7 @@ const PREDEFINED_TEMPLATES = [
                   <div className="space-y-6 py-2">
                     {deepExploreQuestions.map((q: string, i: number) => (
                       <div key={i} className="space-y-2 relative">
-                        <label className="text-[11px] md:text-xs font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
+                        <label className="text-[15px] md:text-base font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
                         <div className="relative">
                           <Input 
                             value={answers[i] || ''}
@@ -1584,7 +1616,7 @@ const PREDEFINED_TEMPLATES = [
                               setAnswers(newAnswers);
                             }}
                             placeholder="写下您的感受..."
-                            className="h-10 md:h-12 bg-transparent border-border/30 focus-visible:ring-accent focus-visible:bg-background/10 text-[13px] md:text-sm pr-10 backdrop-blur-sm"
+                            className="h-10 md:h-12 bg-transparent border-border/30 focus-visible:ring-accent focus-visible:bg-background/10 text-[13px] md:text-sm pr-10 backdrop-blur-sm placeholder:text-muted-foreground/70 placeholder:text-[12px]"
                           />
                           {settings?.enableVoiceInput && (
                             <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -1611,7 +1643,7 @@ const PREDEFINED_TEMPLATES = [
           </motion.div>
         )}
 
-        {step === 'analysis' && analysis && (
+        {step === 'analysis' && (
           <motion.div key="analysis" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4 md:space-y-6 px-1">
             <Card className="border-none shadow-xl bg-card/80 backdrop-blur-md">
               <CardHeader className="relative py-4 md:py-6 px-3">
@@ -1629,18 +1661,55 @@ const PREDEFINED_TEMPLATES = [
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 md:space-y-8 px-3 md:px-6 pb-6">
-                <div className="flex flex-col gap-3">
-                  <Button 
-                    className="w-full h-11 md:h-12 bg-primary hover:bg-accent text-primary-foreground shadow-lg gap-2 text-sm" 
-                    onClick={() => startRelease(0, 'sequential')}
-                    disabled={!analysis.list || analysis.list.length === 0}
-                  >
-                    <RefreshCcw className="w-4 h-4" /> {isAnalyzing ? '开始释放 (同步分析中...)' : '开始释放 (全部顺序)'}
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-1 p-1 bg-muted/20 rounded-lg">
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'all' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost"
+                      onClick={() => setFilterMode('all')}
+                    >
+                      全部 ({analysis?.list?.length || 0})
+                    </Button>
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'unreleased' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost" 
+                      onClick={() => setFilterMode('unreleased')}
+                    >
+                      未释放 ({analysis?.list?.filter((s: any, i: any) => !s.released && !releasedIndices.includes(i)).length || 0})
+                    </Button>
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'released' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost" 
+                      onClick={() => setFilterMode('released')}
+                    >
+                      已释放 ({analysis?.list?.filter((s: any, i: any) => s.released || releasedIndices.includes(i)).length || 0})
+                    </Button>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-[2] h-10 bg-primary hover:bg-accent text-primary-foreground shadow-lg gap-1.5 text-xs" 
+                      onClick={() => {
+                        const firstUnreleased = analysis.list.findIndex((s: any, i: number) => !s.released && !releasedIndices.includes(i));
+                        startRelease(firstUnreleased === -1 ? 0 : firstUnreleased, 'sequential');
+                      }}
+                      disabled={!analysis?.list || analysis.list.length === 0}
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5" /> {isAnalyzing ? '分析中...' : '开始释放'}
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="flex-[3] h-10 border-primary/30 hover:bg-primary/5 text-primary gap-1.5 text-xs"
+                      onClick={() => handleDeepExplore()}
+                      disabled={isDeepExploring}
+                    >
+                      <Target className="w-3.5 h-3.5" /> 继续深入
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 md:gap-3">
-                  {analysis.w && analysis.w.map((w: string) => (
+                  {analysis?.w && analysis.w.map((w: string) => (
                     <Badge key={w} className="bg-accent/20 text-accent border-none px-2.5 md:px-4 py-1.5 text-[10px] md:text-sm">
                       {WANT_LABELS[w as WantType] || w}
                     </Badge>
@@ -1649,23 +1718,34 @@ const PREDEFINED_TEMPLATES = [
                 
                 <ScrollArea className="h-[400px] md:h-[450px] pr-2 md:pr-4">
                   <div className="space-y-4">
-                    {analysis.list && analysis.list.map((item: any, i: number) => (
-                      <div key={i} className={`p-4 rounded-xl border border-border/30 space-y-3 relative group ${(item.released || releasedIndices.includes(i)) ? 'opacity-50 bg-muted/20 border-success/30' : 'bg-background/40'}`}>
+                    {analysis?.list && analysis.list
+                      .map((item: any, i: number) => ({ ...item, originalIdx: i }))
+                      .filter((s: any) => {
+                        if (filterMode === 'all') return true;
+                        const isReleased = s.released || releasedIndices.includes(s.originalIdx);
+                        if (filterMode === 'unreleased') return !isReleased;
+                        if (filterMode === 'released') return isReleased;
+                        return true;
+                      })
+                      .map((s: any) => {
+                        const i = s.originalIdx;
+                        return (
+                      <div key={i} className={`p-3 md:p-4 rounded-xl border border-border/30 group space-y-2 relative ${(s.released || releasedIndices.includes(i)) ? 'opacity-50 bg-muted/20 grayscale-[0.5]' : 'bg-background/40 hover:border-accent/30 shadow-sm transition-all'}`}>
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2">
                             <span className="text-[8px] md:text-[9px] font-bold text-muted-foreground/40 uppercase tracking-tighter">第 {i + 1} 点</span>
-                            {(item.released || releasedIndices.includes(i)) && <Badge variant="outline" className="text-[8px] h-4 px-1 border-success text-success bg-success/10">已释放</Badge>}
+                            {(s.released || releasedIndices.includes(i)) && <Badge variant="outline" className="text-[8px] h-4 px-1 border-success text-success bg-success/10">已释放</Badge>}
                           </div>
                           <button 
                             onClick={() => toggleSentenceReleased(i)}
-                            className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center transition-all ${(item.released || releasedIndices.includes(i)) ? 'bg-success text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-success/10 hover:text-success'}`}
+                            className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center transition-all ${(s.released || releasedIndices.includes(i)) ? 'bg-success text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-success/10 hover:text-success'}`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
                         <div className="flex flex-nowrap overflow-x-auto no-scrollbar gap-1 items-center py-0.5 justify-end">
-                          {item.w && item.w.map((w: WantType) => (
+                          {s.w && s.w.map((w: WantType) => (
                             <Badge key={w} variant="secondary" className="bg-secondary/20 text-foreground border-none px-1.5 py-0 text-[8px] flex items-center gap-1 shrink-0">
                               {WANT_LABELS[w]}
                               <X className="w-2 h-2 cursor-pointer hover:text-destructive" onClick={() => toggleWant(i, w)} />
@@ -1684,7 +1764,7 @@ const PREDEFINED_TEMPLATES = [
                                     key={w} 
                                     variant="ghost" 
                                     size="sm" 
-                                    className={`justify-start font-normal text-[10px] h-7 ${item.w && item.w.includes(w) ? 'bg-accent/20 text-accent' : ''}`}
+                                    className={`justify-start font-normal text-[10px] h-7 ${s.w && s.w.includes(w) ? 'bg-accent/20 text-accent' : ''}`}
                                     onClick={() => toggleWant(i, w)}
                                   >
                                     {WANT_LABELS[w]}
@@ -1696,21 +1776,21 @@ const PREDEFINED_TEMPLATES = [
                         </div>
 
                         <div className="space-y-2">
-                          <p className="text-[10px] md:text-xs text-muted-foreground/60 leading-tight">Q: {item.q || '问题内容正在同步...'}</p>
-                          <p className="text-[13px] md:text-sm text-foreground/90 leading-snug font-serif italic">"{item.ans || item.s || '未回答'}"</p>
+                          <p className="text-[10px] md:text-xs text-muted-foreground/60 leading-tight">Q: {s.q || '问题内容正在同步...'}</p>
+                          <p className="text-[13px] md:text-sm text-foreground/90 leading-snug font-serif italic">"{s.s}"</p>
                           
-                          {item.note && (
+                          {s.note && (
                             <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/10 flex gap-2 items-start">
                               <StickyNote className="w-3 h-3 text-secondary mt-0.5 shrink-0" />
-                              <p className="text-[10px] text-muted-foreground whitespace-pre-wrap">{item.note}</p>
+                              <p className="text-[10px] text-muted-foreground whitespace-pre-wrap">{s.note}</p>
                             </div>
                           )}
                         </div>
                         
-                        {item.a && (
+                        {s.a && (
                           <div className="p-3 rounded-xl bg-accent/5 border border-accent/10">
                             <p className="text-[11px] md:text-[12px] text-muted-foreground leading-relaxed">
-                              <span className="font-bold text-accent mr-1 uppercase text-[9px] tracking-tight">解析:</span> {item.a}
+                              <span className="font-bold text-accent mr-1 uppercase text-[9px] tracking-tight">解析:</span> {s.a}
                             </p>
                           </div>
                         )}
@@ -1727,33 +1807,13 @@ const PREDEFINED_TEMPLATES = [
                           </Button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
 
-                <div className="p-4 md:p-6 rounded-2xl bg-secondary/10 border border-secondary/20 leading-relaxed text-xs md:text-base text-foreground/90 italic">
-                  <h4 className="font-bold text-[10px] md:text-sm mb-2 text-secondary-foreground flex items-center gap-2 uppercase tracking-wide not-italic">
-                    <RefreshCcw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAnalyzing ? 'animate-spin' : ''}`} /> 分析总结
-                  </h4>
-                  {isAnalyzing && (!analysis.sum || analysis.sum.length < 5) ? (
-                    <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>正在深度提炼整体想要...</span>
-                    </div>
-                  ) : (
-                    analysis.sum
-                  )}
-                </div>
                 
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    className="flex-1 h-11 md:h-12 bg-primary hover:bg-accent text-primary-foreground text-xs md:text-sm font-bold shadow-md" 
-                    onClick={() => handleDeepExplore()}
-                    disabled={isDeepExploring}
-                    title="基于本轮回答，AI 生成更深入的释放问句"
-                  >
-                    {isDeepExploring ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Target className="w-4 h-4 mr-2" />} 继续深入
-                  </Button>
                   <Button variant="secondary" className="flex-1 h-11 md:h-12 border-primary/30 hover:bg-primary/5 text-xs md:text-sm" onClick={handleManualSave}>
                     <Save className="w-4 h-4 mr-2" /> 手动保存
                   </Button>
@@ -1802,7 +1862,7 @@ const PREDEFINED_TEMPLATES = [
 
               {/* Row 2: Original Sentence */}
               <h2 className="text-[19px] md:text-[22px] font-serif font-bold leading-relaxed text-foreground px-2">
-                "{analysis.list[releaseIndex].ans || analysis.list[releaseIndex].s || analysis.list[releaseIndex].q}"
+                "{analysis.list[releaseIndex].s || analysis.list[releaseIndex].ans || analysis.list[releaseIndex].q}"
               </h2>
 
               {/* Row 3: Explanation */}
@@ -1921,6 +1981,29 @@ const PREDEFINED_TEMPLATES = [
                 <div key={i} className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-500 ${i === sixStepIndex ? 'bg-accent w-6 md:w-8' : 'bg-muted'}`} />
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Fallback rendering to prevent white screen */}
+        {![
+          'list', 'area_history', 'history', 'questions', 'deep_questions', 'analysis', 'release'
+        ].includes(step) && (
+          <motion.div key="fallback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center">
+              <RefreshCcw className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-muted-foreground">状态异常</h3>
+            <p className="text-sm text-muted-foreground/80 max-w-md">
+              当前状态异常，点击下方按钮返回主界面
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => setStep('list')}
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              返回领域列表
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

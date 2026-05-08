@@ -632,7 +632,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                       className="flex-[3] h-10 border-primary/30 hover:bg-primary/5 text-primary gap-1.5 text-xs"
                       onClick={() => setShowExploreMoreUI(true)}
                     >
-                      <Plus className="w-3.5 h-3.5" /> +探索更多想要
+                      <Plus className="w-3.5 h-3.5" /> 探索更多想要
                     </Button>
                   </div>
                 </div>
@@ -750,7 +750,7 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
                   {isAnalyzing && (!getAnalysisSummary(analysis) || getAnalysisSummary(analysis).length < 5) ? (
                     <div className="flex items-center gap-2 text-muted-foreground animate-pulse mt-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      <span className="text-[11px]">正在深度分析整体执念...</span>
+                      <span className="text-[11px]">正在深度分析整体想要...</span>
                     </div>
                   ) : (
                     <p className="text-xs md:text-sm leading-relaxed opacity-90 text-foreground/80 italic whitespace-pre-wrap">{getAnalysisSummary(analysis)}</p>

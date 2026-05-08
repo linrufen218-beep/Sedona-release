@@ -383,7 +383,7 @@ content = content.replace(old_list_close, new_list_close)
 # 18. Add swipe section to cards
 # Replace card div wrapper to add swipe reveal
 old_card_start = '<div key={area.id} className="relative overflow-hidden rounded-xl">\n                    <Card'
-new_card_start = '''<div key={area.id} className="relative overflow-hidden rounded-xl">
+new_card_start = r'''<div key={area.id} className="relative overflow-hidden rounded-xl">
                     {!isEditMode && swipedCardId === area.id && (
                       <div className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center z-0">
                         <Button
@@ -412,8 +412,7 @@ old_pointer_down = '''onPointerDown={(e) => {
                         const timer = setTimeout(() => {'''
 new_pointer_down = '''onPointerDown={(e) => {
                         if (isEditMode) return;
-                        swipeStartX.current = e.clientX;
-                        swipeCurrentX.current = e.clientX;
+                        handleSwipeStart(area.id, e.clientX);
                         isLongPressActive.current = false;
                         const timer = setTimeout(() => {'''
 content = content.replace(old_pointer_down, new_pointer_down)

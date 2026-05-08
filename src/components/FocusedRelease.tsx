@@ -132,7 +132,13 @@ const THREE_STEPS = [
   "你能释放它吗？"
 ];
 
-export default function FocusedRelease({ settings }: { settings?: AppSettings }) {
+export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab }: { 
+  settings?: AppSettings;
+  globalIsAnalyzing: boolean;
+  setGlobalIsAnalyzing: (value: boolean) => void;
+  analyzingTab: string | null;
+  setAnalyzingTab: (value: string | null) => void;
+}) {
   const [selectedTheme, setSelectedTheme] = useState<any>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.selectedTheme || null);
   const [answers, setAnswers] = useState<string[]>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.answers || []);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -170,6 +176,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
   const [isMergedRelease, setIsMergedRelease] = useState(false);
   const [releaseOrderMode, setReleaseOrderMode] = useState<'round' | 'list'>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.releaseOrderMode || 'round');
   const [selectedRound, setSelectedRound] = useState<number | 'all'>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.selectedRound || 'all');
+  const [filterMode, setFilterMode] = useState<'all' | 'unreleased' | 'released'>('all');
 
   // Resolve current active steps and labels
   const getAssignment = () => {
@@ -345,7 +352,13 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
   };
 
   const handleAnalyze = async () => {
+    if (!selectedTheme) {
+      alert('请先选择一个主题');
+      return;
+    }
     setIsAnalyzing(true);
+    setGlobalIsAnalyzing(true);
+    setAnalyzingTab('focused');
     setStep('analysis');
     setAnalysis({ list: [], w: [], sum: '' });
     try {
@@ -455,6 +468,10 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
       setStep('questions');
     } finally {
       setIsAnalyzing(false);
+      if (analyzingTab === 'focused') {
+        setGlobalIsAnalyzing(false);
+        setAnalyzingTab(null);
+      }
     }
   };
 
@@ -640,17 +657,20 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
         }
       }
     } else {
-      // Single release finished
-      if (analysis.list.length > 0 && newReleased.length + skippedIndices.length === analysis.list.length) {
-        if (isAnalyzing) {
-          setStep('analysis');
-        } else {
-          finishRelease(newReleased);
-        }
+      if (releaseIndex < analysis.list.length - 1) {
+        setReleaseIndex(releaseIndex + 1);
+        setSixStepIndex(0);
+        setActiveSteps(getEffectiveSteps(releaseIndex + 1, 'single'));
       } else {
-        setStep('analysis');
-        // If single release, we still want to save the status
-        finishRelease(newReleased);
+        if (analysis.list.length > 0 && newReleased.length + skippedIndices.length === analysis.list.length) {
+          if (isAnalyzing) {
+            setStep('analysis');
+          } else {
+            finishRelease(newReleased);
+          }
+        } else {
+          setStep('analysis');
+        }
       }
     }
   };
@@ -700,22 +720,36 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
         setSixStepIndex(0);
         setActiveSteps(getEffectiveSteps(nextIndex, 'sequential'));
       } else {
-        if (isAnalyzing) {
-          setStep('analysis');
+        const totalProcessed = new Set([...releasedIndices, ...newSkipped]).size;
+        if (analysis.list.length > 0 && totalProcessed === analysis.list.length) {
+          if (isAnalyzing) {
+            setStep('analysis');
+          } else {
+            finishRelease();
+          }
         } else {
-          finishRelease();
+          setStep('analysis');
         }
       }
     } else {
-      // Single release finished
-      if (analysis.list.length > 0 && releasedIndices.length + newSkipped.length === analysis.list.length) {
+      const totalProcessed = new Set([...releasedIndices, ...newSkipped]).size;
+      if (analysis.list.length > 0 && totalProcessed === analysis.list.length) {
         if (isAnalyzing) {
           setStep('analysis');
         } else {
           finishRelease();
         }
       } else {
-        setStep('analysis');
+        const nextIndex = analysis.list.findIndex((_: any, i: number) => 
+          !releasedIndices.includes(i) && !newSkipped.includes(i)
+        );
+        if (nextIndex !== -1) {
+          setReleaseIndex(nextIndex);
+          setSixStepIndex(0);
+          setActiveSteps(getEffectiveSteps(nextIndex, 'single'));
+        } else {
+          setStep('analysis');
+        }
       }
     }
   };
@@ -1217,7 +1251,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
           </motion.div>
         )}
 
-        {step === 'questions' && (
+        {step === 'questions' && selectedTheme && (
           <motion.div key="questions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 md:space-y-6 px-1">
             <Card className="border-none shadow-xl bg-card/80 backdrop-blur-md">
               <CardHeader className="text-center relative py-4 px-3">
@@ -1275,7 +1309,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                     ) : (
                       selectedTheme.questions.map((q: string, i: number) => (
                         <div key={i} className="space-y-2 relative">
-                          <label className="text-[11px] md:text-xs font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
+                          <label className="text-[15px] md:text-base font-medium text-foreground/80 leading-relaxed block">{i + 1}. {q}</label>
                           <div className="relative">
                             <Input 
                               value={answers[i]}
@@ -1285,7 +1319,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                                 setAnswers(newAnswers);
                               }}
                               placeholder="写下您的感受..."
-                              className="h-10 md:h-12 bg-background/40 border-border/30 focus-visible:ring-accent text-[13px] md:text-sm pr-10"
+                              className="h-10 md:h-12 bg-background/40 border-border/30 focus-visible:ring-accent text-[13px] md:text-sm pr-10 placeholder:text-muted-foreground/70 placeholder:text-[12px]"
                             />
                             {settings?.enableVoiceInput && (
                               <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -1580,7 +1614,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
           </motion.div>
         )}
 
-        {step === 'analysis' && selectedTheme?.id !== 'stuck' && analysis && (
+        {step === 'analysis' && selectedTheme && selectedTheme.id !== 'stuck' && (
           <motion.div key="analysis" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4 md:space-y-6 px-1">
             <Card className="border-none shadow-xl bg-card/80 backdrop-blur-md">
               <CardHeader className="relative pt-2.5 pb-1 md:pt-4 md:pb-2 px-3">
@@ -1602,9 +1636,18 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 px-3 md:px-6 pb-6 pt-0">
-                <div className="flex flex-col gap-2">
-                  {selectedTheme?.id !== 'ai-gen' && (
-                    <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
+                {!analysis || (isAnalyzing && (!analysis.list || analysis.list.length === 0)) ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">AI 正在分析您的回答...</p>
+                      <p className="text-xs text-muted-foreground/70">请稍等片刻，正在深度提炼您的想要</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {selectedTheme?.id !== 'ai-gen' && (
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
                       <button 
                         className={`py-1.5 md:py-2 text-[10px] md:text-sm rounded-lg transition-all ${releaseOrderMode === 'round' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
                         onClick={() => setReleaseOrderMode('round')}
@@ -1630,7 +1673,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                       >
                         全部
                       </Button>
-                      {Array.from(new Set((analysis.list || []).map((item: any) => item.round || 1)))
+                      {analysis.list && Array.from(new Set((analysis.list || []).map((item: any) => item.round || 1)))
                         .sort((a: any, b: any) => a - b)
                         .map((round: any) => (
                         <Button 
@@ -1645,6 +1688,30 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                       ))}
                     </div>
                   )}
+
+                  <div className="flex items-center justify-between gap-1 p-1 bg-muted/20 rounded-lg">
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'all' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost"
+                      onClick={() => setFilterMode('all')}
+                    >
+                      全部 ({analysis?.list?.length || 0})
+                    </Button>
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'unreleased' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost" 
+                      onClick={() => setFilterMode('unreleased')}
+                    >
+                      未释放 ({analysis?.list?.filter((s: any, i: any) => !s.released && !releasedIndices.includes(i)).length || 0})
+                    </Button>
+                    <Button 
+                      className={`flex-1 h-7 text-[14px] rounded-md transition-all ${filterMode === 'released' ? 'bg-background shadow-sm text-accent font-bold' : 'text-muted-foreground hover:bg-background/40'}`}
+                      variant="ghost" 
+                      onClick={() => setFilterMode('released')}
+                    >
+                      已释放 ({analysis?.list?.filter((s: any, i: any) => s.released || releasedIndices.includes(i)).length || 0})
+                    </Button>
+                  </div>
 
                   <Button 
                     className="w-full h-12 md:h-14 bg-primary hover:bg-accent text-primary-foreground shadow-lg gap-2 text-sm md:text-base font-bold rounded-2xl" 
@@ -1669,9 +1736,10 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                     </Button>
                   )}
                 </div>
+                )}
 
                 <div className="flex flex-wrap gap-1.5 md:gap-3">
-                  {analysis.w && analysis.w.map((w: string) => (
+                  {analysis?.w && analysis.w.map((w: string) => (
                     <Badge key={w} className="bg-accent/20 text-accent border-none px-2.5 md:px-4 py-1.5 text-[10px] md:text-sm">
                       {WANT_LABELS[w as WantType] || w}
                     </Badge>
@@ -1684,6 +1752,13 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                         {Object.entries(
                           (analysis.list || [])
                             .filter((item: any) => releaseOrderMode !== 'round' || selectedRound === 'all' || item.round === selectedRound)
+                            .filter((item: any) => {
+                              if (filterMode === 'all') return true;
+                              const isReleased = item.released || releasedIndices.includes((analysis.list || []).indexOf(item));
+                              if (filterMode === 'unreleased') return !isReleased;
+                              if (filterMode === 'released') return isReleased;
+                              return true;
+                            })
                             .reduce((acc: any, curr: any) => {
                               let groupKey = '释放导引';
                               if (releaseOrderMode === 'list') {
@@ -1824,20 +1899,6 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                   </div>
                 </ScrollArea>
 
-                <div className="p-4 md:p-6 rounded-2xl bg-secondary/10 border border-secondary/20 leading-relaxed text-xs md:text-base text-foreground/90 italic">
-                  <h4 className="font-bold text-[10px] md:text-sm mb-2 text-secondary-foreground flex items-center gap-2 uppercase tracking-wide not-italic">
-                    <RefreshCcw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAnalyzing ? 'animate-spin' : ''}`} /> 分析总结
-                  </h4>
-                  {isAnalyzing && (!analysis.sum || analysis.sum.length < 5) ? (
-                    <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>正在深度提炼整体执念...</span>
-                    </div>
-                  ) : (
-                    analysis.sum
-                  )}
-                </div>
-
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
                     variant="outline" 
@@ -1859,7 +1920,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
           </motion.div>
         )}
 
-        {step === 'release' && analysis && (
+        {step === 'release' && analysis && analysis.list && analysis.list[releaseIndex] && (
           <motion.div key="release" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[85vh] md:min-h-[70vh] text-center space-y-3 md:space-y-6 relative px-4 py-4">
             
             <div className="space-y-3 md:space-y-4 max-w-xl w-full flex flex-col items-center">
@@ -1881,7 +1942,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
               {/* Row 2: Original Sentence (with its wrapper) */}
               <div className="w-full">
                 <h2 className="text-[19px] md:text-[24px] font-serif leading-tight text-foreground px-2 font-bold">
-                  "{analysis.list[releaseIndex].ans || analysis.list[releaseIndex].s || analysis.list[releaseIndex].q}"
+                  "{analysis.list[releaseIndex].s || analysis.list[releaseIndex].ans || analysis.list[releaseIndex].q}"
                 </h2>
               </div>
 
@@ -1973,7 +2034,7 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                       {(() => {
                         const sequence = getReleaseSequence();
                         const currentIndexInSeq = sequence.indexOf(releaseIndex);
-                        const isLastInSeq = !isSequential || currentIndexInSeq === sequence.length - 1;
+                        const isLastInSeq = isSequential && currentIndexInSeq === sequence.length - 1;
 
                         if (isLastInSeq) {
                           return (
@@ -1983,6 +2044,20 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                               </Button>
                               <Button variant="outline" size="lg" className="h-12 md:h-14 rounded-2xl border-primary/30 text-primary hover:bg-primary/5 text-sm md:text-base font-bold shadow-sm" onClick={restartSequentialRelease}>
                                 从头开始释放项目
+                              </Button>
+                            </>
+                          );
+                        }
+
+                        const isLastOverall = releaseIndex >= (analysis?.list?.length || 0) - 1;
+                        if (isLastOverall) {
+                          return (
+                            <>
+                              <Button size="lg" className="h-12 md:h-14 rounded-2xl bg-primary hover:bg-accent text-primary-foreground text-sm md:text-base font-bold shadow-lg" onClick={continueRelease}>
+                                完成并退出
+                              </Button>
+                              <Button variant="outline" size="lg" className="h-12 md:h-14 rounded-2xl border-primary/30 text-primary hover:bg-primary/5 text-sm md:text-base font-bold shadow-sm" onClick={restartSequentialRelease}>
+                                从头开始释放
                               </Button>
                             </>
                           );
@@ -2018,6 +2093,48 @@ export default function FocusedRelease({ settings }: { settings?: AppSettings })
                 <div key={i} className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-500 ${i === sixStepIndex ? 'bg-accent w-6 md:w-8' : 'bg-muted'}`} />
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Fallback rendering to prevent white screen */}
+        {((step === 'analysis' || step === 'questions' || step === 'release' || step === 'projects') && !selectedTheme) && (
+          <motion.div key="fallback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center">
+              <RefreshCcw className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-muted-foreground">状态异常</h3>
+            <p className="text-sm text-muted-foreground/80 max-w-md">
+              当前状态异常，点击下方按钮返回主界面
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => setStep('list')}
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              返回主题列表
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Universal fallback for any unmatched state */}
+        {!['list', 'projects', 'questions', 'analysis', 'release'].includes(step) && (
+          <motion.div key="universal-fallback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center">
+              <RefreshCcw className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-muted-foreground">未知状态</h3>
+            <p className="text-sm text-muted-foreground/80 max-w-md">
+              当前状态未知，点击下方按钮返回主界面
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => setStep('list')}
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              返回主题列表
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

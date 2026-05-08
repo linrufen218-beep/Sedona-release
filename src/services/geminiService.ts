@@ -1,5 +1,4 @@
-﻿﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
-const LOCAL_PROXY_URL = '/api/ai-proxy';
+﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
 type AIOptions = {
   model_type?: string;
   invite_code?: string;
@@ -70,33 +69,7 @@ function buildWorkerRequestBody(prompt: string, options?: AIOptions) {
   };
 }
 
-function shouldUseLocalProxy() {
-  if (typeof window === 'undefined') return false;
-  // 在GitHub Pages等静态托管环境中禁用本地代理
-  if (window.location.hostname.includes('github.io')) {
-    return false;
-  }
-  return window.location.protocol === 'http:' || window.location.protocol === 'https:';
-}
-
 async function postToWorker(body: any) {
-  if (shouldUseLocalProxy()) {
-    return fetch(LOCAL_PROXY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: WORKER_URL,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body,
-      }),
-    });
-  }
-
   return fetch(WORKER_URL, {
     method: 'POST',
     headers: {
@@ -196,7 +169,7 @@ export async function callAI(
   } catch (err: any) {
     console.error('[API Error]', err);
     if (err instanceof TypeError) {
-      throw new Error('Network request failed before reaching the worker. If you are on localhost, make sure the dev server is running so /api/ai-proxy can forward to rufen.');
+      throw new Error('Network request failed before reaching the worker.');
     }
     throw err;
   }
@@ -242,13 +215,15 @@ export async function analyzeReleaseText(
   const prompt = `导师指令：分析文本并拆分为释放清单。
     输入：${text}
     要求：
-    1. 【原句直接使用】："原始句子"字段必须直接使用输入文本中的原句，不要对原句进行任何改写、扩展或解释。保持原句的原始表达方式。
+    1. 【绝对禁止重写原句】："原始句子"字段必须100%直接使用输入文本中的原句，绝对禁止对原句进行任何改写、扩展、解释、概括或重述。保持原句的原始表达方式，包括标点符号和语气。
     2. 【语义合并分析】：如果多个句子表达相同的意思或描述同一件事情，请将它们合并为一项进行分析。不要机械地按标点分割，而是根据语义内容进行合并。
     3. 【关键：叙事者视角】：用户是叙事的"我"。文中描述"别人做了某事"时，拆出来的句子必须保留"别人"这个主语，不能把别人的行为写成用户自己的行为。分析的对象始终是"用户面对这些事时内心的想要"，而不是"用户做了什么事"。
     4. 深度剖析：挖掘每项背后用户自身的底层想要（想要被认可、想要控制、想要安全），揭示这些动力的运作方式。
     5. "想要"仅限 [approval, control, security]。
     6. 每项的解析（a）应约30-50字，直击核心。
     7. 分析总结（ana）：对整体进行深度提炼，约50字。
+
+    重要提醒："原始句子"字段必须完全复制输入文本中的句子，不要添加任何内容，不要修改任何词语，不要改变表达方式。
 
     输出必须是纯JSON格式：
     {
@@ -274,33 +249,83 @@ export async function analyzeAIGen(
   onProgress?: (data: any) => void,
   options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
 ) {
-  const prompt = `你是一位精通圣多纳释放法与显化法则的教练。
-    任务：深度剖析以下文本片段，像剥洋葱一样拆解痛点。
-
-    输入文本内容：${text}
-
-    Logic (全息释放逻辑 - 针对该片段识别出的具体事件/情况，都需执行以下5层结构):
-    1. 针对事件正反面的允许 (生成3-4句)：【绝对不要点出具体情绪，而是重点释放在事件/情况本身】。生成允许该情况存在、以及允许其反面情况存在的问句。例如："你允许别人忽视你吗？"、"你允许别人不忽视你吗？"。带到情绪时只说"你允许这种感觉存在吗？"。
-    2. 清理执着面 (生成1句)：引导察觉对当前事件"想要改变它"或"推开它"的渴求。
-    3. 挖掘深层动机 (生成1句)：指出隐藏的匮乏需求（想要控制、认同或安全），引导放下。
-    4. 对立融合 (生成1句)：允许事件发生与不发生并存，察觉都是能量。
-    5. 终极释放与存在 (生成1句)："你能把它放下吗？"终极清理。
-
-    要求：
-    1. 【极致全面】：只要该片段有多个层面或多个句子，就必须逐个痛点/句子循环产出上述问句！把文中提到的每一个核心矛盾/具体事件细细拆解，为它们分别生成连续深入的上述释放问句链。不限数量，务必把片段内的事件放干净，不要省略！
-    2. 【极度简明短促】：每句问句必须非常短。只要纯JSON，不输出多余废话。
-    3. 【克制的引用】：直接使用用户的词汇描述事件，不乱加情绪形容词。
-
-    输出必须是纯JSON格式：
-    {
-      "list": [
-        {
-          "s": "生成的具体释放问句内容",
-          "w": ["control", "approval", "security"],
-          "phase": "主题切入点 - 步骤名称"
-        }
-      ]
-    }`;
+  const prompt = `你是一位精通圣多纳释放法的引导者。
+ 任务：深度剖析以下文本片段，拆解出具体的、可以用一句话概括的痛点事件。
+ 
+ 输入文本内容：${text}
+ 
+ Logic (具象化释放逻辑 - 必须将每个事件单独处理，逐层释放):
+ 
+ 请先识别文本中的"具体事件/感受"，然后用该事件的"一句话概括"来替换下面模板中的[这件事/这个感受]部分。
+ 
+ 针对每一个事件，按顺序生成以下5层问句：
+ (注意：下面模板中的[这件事/这个感受]是一个占位符，你必须将其替换为用户原文中提炼出的、极其具体的描述)
+ 
+ 1. 允许正反面 (共2句)：
+    - 第1句："你能允许[这件事]发生吗？"
+        (例如："你能允许他把网址要回去这件事发生吗？")
+    - 第2句："你能允许[这件事]不发生吗？"
+        (例如："你能允许他不把网址要回去吗？")
+    *若事件纯粹是一种感受，则用："你能允许[这个感受]存在吗？/ 你能允许[这个感受]消失吗？"*
+ 
+ 2. 放下执着 (1句)：
+    直接点出对这件事的内在反应，并引导放下：
+    "你能放下对[这件事]的抗拒吗？"
+    *如果文本更偏向抓取，则用："你能放下对[这件事]的执着吗？"*
+ 
+ 3. 放下深层动机 (1句)：
+    指出这件事暴露出的匮乏，并把需求和具体事件绑定，这样更有抓手：
+    "你能放下希望通过[这件事]来获得控制/认可/安全的需要吗？"
+    (例如："你能放下希望通过得到网址，来获得安全感的渴望吗？")
+ 
+ 4. 对立融合 (1句)：
+    把抽象概念转为具体的、关于过去与未来的表达：
+    "你能允许[这件事]是现在这个样子，同时你又能有一个新的开始吗？"
+ 
+ 5. 终极放下 (1句)：
+    "关于[这件事]，你能完全把它放下吗？"
+ 
+ 要求：
+ - 只要片段中有多个独立事件，就必须逐个拆解循环产出上述5层问句链。
+ - 每个问句都必须清晰、具体，让用户一听就知道在说什么事，杜绝凭空出现的"它"。
+ - 输出纯JSON，格式如下，不添加任何解释：
+ 
+ {
+   "list": [
+     {
+       "s": "你能允许[具体的这件事]发生吗？",
+       "w": ["control"],
+       "phase": "允许正反面-发生"
+     },
+     {
+       "s": "你能允许[具体的这件事]不发生吗？",
+       "w": ["control"],
+       "phase": "允许正反面-不发生"
+     },
+     {
+       "s": "你能放下对[具体的这件事]的抗拒吗？",
+       "w": ["control"],
+       "phase": "放下执着"
+     },
+     {
+       "s": "你能放下希望通过[具体的这件事]来获得认可的渴望吗？",
+       "w": ["approval"],
+       "phase": "放下深层动机"
+     },
+     {
+       "s": "你能允许[具体的这件事]是现在这个样子，同时你又能有一个新的开始吗？",
+       "w": ["security"],
+       "phase": "对立融合"
+     },
+     {
+       "s": "关于[具体的这件事]，你能完全把它放下吗？",
+       "w": ["security"],
+       "phase": "终极放下"
+     }
+   ]
+ }
+ (为每个识别出的具体事件，循环以上JSON结构)
+ `;
 
   try {
     const responseText = await callAI(prompt, undefined, options);

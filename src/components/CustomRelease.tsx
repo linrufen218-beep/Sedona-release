@@ -315,6 +315,20 @@ export default function CustomRelease({ settings }: { settings?: AppSettings }) 
     setReleaseIndex(0);
     setStepIndex(0);
     setPhase('release');
+    
+    // Save record for deep exploration
+    saveRecord({
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().split('T')[0],
+      type: 'custom',
+      content: `深入探索 - ${moreReleaseEmotion.substring(0, 20)}...`,
+      analysis: {
+        list: [newReleaseItem],
+        ana: `深入探索: ${moreReleaseEmotion}`
+      },
+      timestamp: Date.now()
+    });
+    
     setMoreReleaseEmotion('');
     setMoreReleaseWants([]);
     setIsMoreReleaseOpen(false);

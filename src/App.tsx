@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { getSettings, AppSettings, saveSettings } from '@/lib/store';
 import DailyRelease from '@/components/DailyRelease';
 import AreaRelease from '@/components/AreaRelease';
@@ -19,6 +20,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('daily');
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const [hasNewVersion, setHasNewVersion] = useState(false);
+  const [globalIsAnalyzing, setGlobalIsAnalyzing] = useState(false);
+  const [analyzingTab, setAnalyzingTab] = useState<string | null>(null);
   const CURRENT_VERSION = '1.0.1';
 
   useEffect(() => {
@@ -103,17 +106,17 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
           >
-            {activeTab === 'daily' && <DailyRelease settings={settings} />}
-            {activeTab === 'area' && <AreaRelease settings={settings} />}
-            {activeTab === 'focused' && <FocusedRelease settings={settings} />}
-            {activeTab === 'custom' && <CustomRelease settings={settings} />}
+            {activeTab === 'daily' && <DailyRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
+            {activeTab === 'area' && <AreaRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
+            {activeTab === 'focused' && <FocusedRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
+            {activeTab === 'custom' && <CustomRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
             {activeTab === 'history' && <History />}
             {activeTab === 'settings' && <Settings settings={settings} onSettingsChange={setSettings} />}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/80 backdrop-blur-md pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/80 backdrop-blur-md pb-safe z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-around">
           <NavButton 
             active={activeTab === 'daily'} 
