@@ -1,4 +1,7 @@
 ﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
+const REQUEST_TIMEOUT_MS = 90_000;
+const NETWORK_RETRY_DELAYS_MS = [800, 1800];
+
 type AIOptions = {
   model_type?: string;
   invite_code?: string;
@@ -69,14 +72,54 @@ function buildWorkerRequestBody(prompt: string, options?: AIOptions) {
   };
 }
 
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isAbortError(err: any) {
+  return err?.name === 'AbortError';
+}
+
+function isRetriableNetworkError(err: any) {
+  return err instanceof TypeError || isAbortError(err);
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
+}
+
 async function postToWorker(body: any) {
-  return fetch(WORKER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  const payload = JSON.stringify(body);
+
+  for (let attempt = 0; attempt <= NETWORK_RETRY_DELAYS_MS.length; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: payload,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      err.requestSizeBytes = payload.length;
+
+      if (!isRetriableNetworkError(err) || attempt === NETWORK_RETRY_DELAYS_MS.length) {
+        throw err;
+      }
+
+      await delay(NETWORK_RETRY_DELAYS_MS[attempt]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw new Error('Worker request failed unexpectedly.');
 }
 
 function safeJSONParse(text: string) {
@@ -168,8 +211,11 @@ export async function callAI(
     return content;
   } catch (err: any) {
     console.error('[API Error]', err);
+    if (isAbortError(err)) {
+      throw new Error(`AI 请求超时：${REQUEST_TIMEOUT_MS / 1000}s 内没有收到 worker 响应。请求大小约 ${formatBytes(err.requestSizeBytes || 0)}，文本较长时请分段重试。`);
+    }
     if (err instanceof TypeError) {
-      throw new Error('Network request failed before reaching the worker.');
+      throw new Error(`浏览器没有拿到 worker 的 HTTP 响应，通常是网络中断、CORS/preflight 被拦、请求体过大或 worker 异常响应缺少 CORS 头。请求大小约 ${formatBytes((err as any).requestSizeBytes || 0)}。`);
     }
     throw err;
   }
