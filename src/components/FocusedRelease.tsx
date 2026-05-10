@@ -389,6 +389,7 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
                 const originalAnswer = answers[answeredIndices[idx]];
                 return {
                   ...item,
+                  q: selectedTheme.questions[answeredIndices[idx]] || item.q || '',
                   ans: originalAnswer,
                   round: currentRound
                 };
@@ -422,6 +423,7 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
             const originalAnswer = answers[answeredIndices[idx]];
             return {
               ...item,
+              q: selectedTheme.questions[answeredIndices[idx]] || item.q || '',
               ans: originalAnswer,
               round: currentRound
             };
@@ -1941,6 +1943,14 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
 
               {/* Row 2: Original Sentence (with its wrapper) */}
               <div className="w-full">
+                {selectedTheme?.id !== 'ai-gen' && analysis.list[releaseIndex].q && (
+                  <div className="max-w-lg mx-auto mb-3 px-3 py-2 rounded-xl bg-muted/20 border border-border/20 text-left">
+                    <span className="block text-[9px] md:text-[10px] text-muted-foreground/60 font-sans font-medium mb-1">问题</span>
+                    <p className="text-[11px] md:text-sm text-muted-foreground leading-relaxed">
+                      {analysis.list[releaseIndex].q}
+                    </p>
+                  </div>
+                )}
                 <h2 className="text-[19px] md:text-[24px] font-serif leading-tight text-foreground px-2 font-bold">
                   "{analysis.list[releaseIndex].s || analysis.list[releaseIndex].ans || analysis.list[releaseIndex].q}"
                 </h2>

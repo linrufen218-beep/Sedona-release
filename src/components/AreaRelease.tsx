@@ -519,6 +519,7 @@ const PREDEFINED_TEMPLATES = [
               const originalAnswer = answers[answeredIndices[idx]];
               return {
                 ...item,
+                q: selectedArea.questions[answeredIndices[idx]] || item.q || '',
                 ans: originalAnswer
               };
             });
@@ -541,6 +542,7 @@ const PREDEFINED_TEMPLATES = [
           const originalAnswer = answers[answeredIndices[idx]];
           return {
             ...item,
+            q: selectedArea.questions[answeredIndices[idx]] || item.q || '',
             ans: originalAnswer
           };
         });
@@ -665,6 +667,7 @@ const PREDEFINED_TEMPLATES = [
               const originalAnswer = answers[answeredIndices[idx]];
               return {
                 ...item,
+                q: deepExploreQuestions[answeredIndices[idx]] || item.q || '',
                 ans: originalAnswer
               };
             });
@@ -686,6 +689,7 @@ const PREDEFINED_TEMPLATES = [
           const originalAnswer = answers[answeredIndices[idx]];
           return {
             ...item,
+            q: deepExploreQuestions[answeredIndices[idx]] || item.q || '',
             ans: originalAnswer
           };
         });
@@ -1861,6 +1865,14 @@ const PREDEFINED_TEMPLATES = [
               </div>
 
               {/* Row 2: Original Sentence */}
+              {analysis.list[releaseIndex].q && (
+                <div className="max-w-lg px-3 py-2 rounded-xl bg-muted/20 border border-border/20 text-left">
+                  <span className="block text-[9px] md:text-[10px] text-muted-foreground/60 font-sans font-medium mb-1">问题</span>
+                  <p className="text-[11px] md:text-sm text-muted-foreground leading-relaxed">
+                    {analysis.list[releaseIndex].q}
+                  </p>
+                </div>
+              )}
               <h2 className="text-[19px] md:text-[22px] font-serif font-bold leading-relaxed text-foreground px-2">
                 "{analysis.list[releaseIndex].s || analysis.list[releaseIndex].ans || analysis.list[releaseIndex].q}"
               </h2>

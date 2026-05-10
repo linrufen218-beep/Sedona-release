@@ -106,10 +106,10 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
           >
-            {activeTab === 'daily' && <DailyRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
+            {activeTab === 'daily' && <DailyRelease settings={settings} />}
             {activeTab === 'area' && <AreaRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
             {activeTab === 'focused' && <FocusedRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
-            {activeTab === 'custom' && <CustomRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
+            {activeTab === 'custom' && <CustomRelease settings={settings} />}
             {activeTab === 'history' && <History />}
             {activeTab === 'settings' && <Settings settings={settings} onSettingsChange={setSettings} />}
           </motion.div>
