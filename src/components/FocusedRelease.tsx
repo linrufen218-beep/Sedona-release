@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AppSettings, saveRecord, addStuckSentence, getStuckSentences, removeStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, WantType, getFocusedProjects, saveFocusedProject, deleteFocusedProject, FocusedProject } from '@/lib/store';
-import { analyzeAreaAnswers, analyzeAIGen, callAI } from '@/services/geminiService';
+import { AppSettings, saveRecord, addStuckSentence, getStuckSentences, removeStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, WantType, getFocusedProjects, saveFocusedProject, deleteFocusedProject, FocusedProject, BackgroundTask, getBackgroundTask, clearBackgroundTask } from '@/lib/store';
+import { analyzeAreaAnswers, analyzeAIGen, callAI, safeJSONParse } from '@/services/geminiService';
 import { Loader2, Target, RefreshCcw, ChevronLeft, X, LogOut, MessageCircle, Trash2, Send, Smile, CheckCircle2, Save, Zap, HelpCircle, User, Plus, Circle, CheckCircle, ArrowRight, FolderPlus, FileText, Calendar, StickyNote, Mic } from 'lucide-react';
 import { VoiceInput } from './VoiceInput';
 import { format } from 'date-fns';
@@ -132,12 +132,14 @@ const THREE_STEPS = [
   "你能释放它吗？"
 ];
 
-export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab }: { 
+export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab, bgTask, clearBgTask }: { 
   settings?: AppSettings;
   globalIsAnalyzing: boolean;
   setGlobalIsAnalyzing: (value: boolean) => void;
   analyzingTab: string | null;
   setAnalyzingTab: (value: string | null) => void;
+  bgTask: BackgroundTask | null;
+  clearBgTask: () => void;
 }) {
   const [selectedTheme, setSelectedTheme] = useState<any>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.selectedTheme || null);
   const [answers, setAnswers] = useState<string[]>(() => getComponentState(STORAGE_KEYS.FOCUSED_STATE)?.answers || []);
@@ -248,6 +250,24 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
       saveFocusedProject(updated);
     }
   }, [selectedTheme, answers, analysis, step, stuckMode, chatMessages, releaseIndex, releasedIndices, skippedIndices, sixStepIndex, currentProject, releaseOrderMode]);
+
+  useEffect(() => {
+    const task = getBackgroundTask();
+    if (task && task.status === 'done' && task.tab === 'focused' && task.result) {
+      try {
+        const parsed = typeof task.result === 'string' ? safeJSONParse(task.result) : task.result;
+        if (parsed) {
+          setAnalysis(parsed);
+          setStep('analysis');
+          setIsAnalyzing(false);
+          setGlobalIsAnalyzing(false);
+        }
+      } catch (e) {
+        console.error('Failed to restore background task result:', e);
+      }
+      clearBackgroundTask();
+    }
+  }, []);
 
   const startTheme = (theme: any) => {
     setSelectedTheme(theme);
@@ -372,7 +392,7 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
           aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-        });
+        }, 'focused');
       } else {
         const currentRound = currentProject 
           ? (Math.max(0, ...currentProject.list.map(i => i.round || 1)) + 1) 
@@ -413,7 +433,8 @@ export default function FocusedRelease({ settings, globalIsAnalyzing, setGlobalI
             aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
             aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
             aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-          }
+          },
+          'focused'
         );
         
         // Merge user answers into the analysis list

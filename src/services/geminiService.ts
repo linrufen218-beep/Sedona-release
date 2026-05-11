@@ -1,5 +1,7 @@
-﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
-const REQUEST_TIMEOUT_MS = 180_000;
+import { startBackgroundTask, finishBackgroundTask } from '@/lib/store';
+
+const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
+const REQUEST_TIMEOUT_MS = 300_000;
 const NETWORK_RETRY_DELAYS_MS = [800, 1800];
 
 type AIOptions = {
@@ -123,7 +125,7 @@ async function postToWorker(body: any) {
   throw new Error('Worker request failed unexpectedly.');
 }
 
-function safeJSONParse(text: string) {
+export function safeJSONParse(text: string) {
   try {
     const parsed = JSON.parse(text);
     return parsed;
@@ -187,10 +189,15 @@ function splitIntoChunks(text: string, maxLength: number): string[] {
 export async function callAI(
   prompt: string,
   onProgress?: (text: string) => void,
-  options?: AIOptions
+  options?: AIOptions,
+  backgroundTab?: string,
 ) {
   if (!WORKER_URL.trim()) {
     throw new Error('WORKER_URL is not configured.');
+  }
+
+  if (backgroundTab) {
+    startBackgroundTask(backgroundTab);
   }
 
   const body = buildWorkerRequestBody(prompt, options);
@@ -209,9 +216,19 @@ export async function callAI(
     console.log('[Extracted Content]:', content);
 
     if (onProgress) onProgress(content);
+
+    if (backgroundTab) {
+      finishBackgroundTask(content);
+    }
+
     return content;
   } catch (err: any) {
     console.error('[API Error]', err);
+
+    if (backgroundTab) {
+      finishBackgroundTask(undefined, err.message || 'Unknown error');
+    }
+
     if (isAbortError(err)) {
       throw new Error(`AI 请求超时：${REQUEST_TIMEOUT_MS / 1000}s 内没有收到 worker 响应。请求大小约 ${formatBytes(err.requestSizeBytes || 0)}。这通常是模型生成较慢、worker 或上游接口超时，不一定是文本太长。请稍后重试，或换更快的模型/减少生成要求。`);
     }
@@ -257,7 +274,8 @@ async function handleError(response: Response) {
 export async function analyzeReleaseText(
   text: string,
   onProgress?: (data: any) => void,
-  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
+  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string },
+  backgroundTab?: string,
 ) {
   const prompt = `导师指令：分析文本并拆分为释放清单。
     输入：${text}
@@ -281,7 +299,7 @@ export async function analyzeReleaseText(
     }`;
 
   try {
-    const responseText = await callAI(prompt, undefined, options);
+    const responseText = await callAI(prompt, undefined, options, backgroundTab);
     const result = safeJSONParse(responseText || '');
     if (onProgress) onProgress(result);
     return result;
@@ -294,7 +312,8 @@ export async function analyzeReleaseText(
 export async function analyzeAIGen(
   text: string,
   onProgress?: (data: any) => void,
-  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
+  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string },
+  backgroundTab?: string,
 ) {
   const prompt = `你是一位精通圣多纳释放法的引导者。
  任务：深度剖析以下文本片段，拆解出具体的、可以用一句话概括的痛点事件。
@@ -375,7 +394,7 @@ export async function analyzeAIGen(
  `;
 
   try {
-    const responseText = await callAI(prompt, undefined, options);
+    const responseText = await callAI(prompt, undefined, options, backgroundTab);
     const result = safeJSONParse(responseText || '');
     if (onProgress) onProgress(result);
     return result;
@@ -423,7 +442,8 @@ export async function analyzeAreaAnswers(
   questions: string[],
   answers: string[],
   onProgress?: (data: any) => void,
-  options?: { model_type?: string; invite_code?: string; history?: any[]; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
+  options?: { model_type?: string; invite_code?: string; history?: any[]; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string },
+  backgroundTab?: string,
 ) {
   const answeredIndices = answers.map((a, i) => (a.trim() ? i : -1)).filter(i => i !== -1);
   const answeredQuestions = answeredIndices.map(i => questions[i]);
@@ -458,7 +478,7 @@ export async function analyzeAreaAnswers(
       "sum": "分析总结内容"
     }`;
 
-  const responseText = await callAI(prompt, undefined, options);
+  const responseText = await callAI(prompt, undefined, options, backgroundTab);
   const result = safeJSONParse(responseText || '');
   if (onProgress) onProgress(result);
   return result;
@@ -510,7 +530,8 @@ export async function generateDeepExploreQuestions(
 export async function analyzeEmotions(
   text: string,
   onProgress?: (data: any) => void,
-  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string }
+  options?: { model_type?: string; invite_code?: string; aiBaseUrl?: string; aiApiKey?: string; aiModelName?: string },
+  backgroundTab?: string,
 ) {
   const prompt = `导师指令：分析情绪类别与根源想要。
     输入：${text}
@@ -525,7 +546,7 @@ export async function analyzeEmotions(
       "ana": "底层想要与根源分析"
     }`;
 
-  const responseText = await callAI(prompt, undefined, options);
+  const responseText = await callAI(prompt, undefined, options, backgroundTab);
   const result = safeJSONParse(responseText || '');
   if (onProgress) onProgress(result);
   return result;

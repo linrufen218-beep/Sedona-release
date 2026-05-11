@@ -377,3 +377,42 @@ export function deleteFocusedProject(id: string) {
   const filtered = projects.filter(p => p.id !== id);
   saveFocusedProjects(filtered);
 }
+
+// ========== 后台 AI 任务（模块级，切换 tab 不丢失） ==========
+
+export interface BackgroundTask {
+  tab: string;
+  status: 'running' | 'done';
+  result?: any;
+  error?: string;
+  context?: string;
+}
+
+let _bgTask: BackgroundTask | null = null;
+const _bgListeners = new Set<() => void>();
+
+export function getBackgroundTask(): BackgroundTask | null {
+  return _bgTask;
+}
+
+export function startBackgroundTask(tab: string, context?: string) {
+  _bgTask = { tab, status: 'running', context };
+  _bgListeners.forEach(fn => fn());
+}
+
+export function finishBackgroundTask(result?: any, error?: string) {
+  if (_bgTask) {
+    _bgTask = { ..._bgTask, status: 'done', result, error };
+    _bgListeners.forEach(fn => fn());
+  }
+}
+
+export function clearBackgroundTask() {
+  _bgTask = null;
+  _bgListeners.forEach(fn => fn());
+}
+
+export function onBackgroundTaskChange(fn: () => void) {
+  _bgListeners.add(fn);
+  return () => { _bgListeners.delete(fn); };
+}

@@ -6,8 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { AppSettings, saveRecord, addStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, WantType, getAreaSessions, saveAreaSession, deleteAreaSession, AreaSession, CustomArea, getCustomAreas, saveCustomArea, deleteCustomArea, saveCustomAreas } from '@/lib/store';
-import { analyzeAreaAnswers, callAI, generateCustomAreaQuestions, generateDeepExploreQuestions } from '@/services/geminiService';
+import { AppSettings, saveRecord, addStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, WantType, getAreaSessions, saveAreaSession, deleteAreaSession, AreaSession, CustomArea, getCustomAreas, saveCustomArea, deleteCustomArea, saveCustomAreas, BackgroundTask, getBackgroundTask, clearBackgroundTask } from '@/lib/store';
+import { analyzeAreaAnswers, callAI, generateCustomAreaQuestions, generateDeepExploreQuestions, safeJSONParse } from '@/services/geminiService';
 import { Loader2, ChevronRight, ChevronLeft, CheckCircle2, RefreshCcw, X, LogOut, Save, Zap, Plus, Calendar, Trash2, History, ArrowRight, FileText, Circle, CheckCircle, StickyNote, Settings2, Target, ArrowUp, ArrowDown, Mic } from 'lucide-react';
 import { VoiceInput } from './VoiceInput';
 import { motion, AnimatePresence } from 'motion/react';
@@ -101,12 +101,14 @@ const THREE_STEPS = [
   "你能释放它吗？"
 ];
 
-export default function AreaRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab }: { 
+export default function AreaRelease({ settings, globalIsAnalyzing, setGlobalIsAnalyzing, analyzingTab, setAnalyzingTab, bgTask, clearBgTask }: { 
   settings?: AppSettings;
   globalIsAnalyzing: boolean;
   setGlobalIsAnalyzing: (value: boolean) => void;
   analyzingTab: string | null;
   setAnalyzingTab: (value: string | null) => void;
+  bgTask: BackgroundTask | null;
+  clearBgTask: () => void;
 }) {
   const [selectedArea, setSelectedArea] = useState<any>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.selectedArea || null);
   const [answers, setAnswers] = useState<string[]>(() => getComponentState(STORAGE_KEYS.AREA_STATE)?.answers || []);
@@ -441,6 +443,24 @@ const PREDEFINED_TEMPLATES = [
     });
   }, [selectedArea, answers, analysis, step, releaseIndex, releasedIndices, skippedIndices, sixStepIndex, currentSession, deepExploreProjectId, deepExploreRound, deepExploreQuestions]);
 
+  useEffect(() => {
+    const task = getBackgroundTask();
+    if (task && task.status === 'done' && task.tab === 'area' && task.result) {
+      try {
+        const parsed = typeof task.result === 'string' ? safeJSONParse(task.result) : task.result;
+        if (parsed) {
+          setAnalysis(parsed);
+          setStep('analysis');
+          setIsAnalyzing(false);
+          setGlobalIsAnalyzing(false);
+        }
+      } catch (e) {
+        console.error('Failed to restore background task result:', e);
+      }
+      clearBackgroundTask();
+    }
+  }, []);
+
   const startArea = (area: any) => {
     setSelectedArea(area);
     setStep('area_history');
@@ -532,7 +552,8 @@ const PREDEFINED_TEMPLATES = [
           aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-        }
+        },
+        'area'
       );
       
       // Merge user answers into the analysis list for display during release
@@ -680,7 +701,8 @@ const PREDEFINED_TEMPLATES = [
           aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-        }
+        },
+        'area'
       );
 
       const answeredIndices = answers.map((a, i) => a.trim() ? i : -1).filter(i => i !== -1);

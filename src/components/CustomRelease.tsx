@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { AppSettings, saveRecord, getComponentState, saveComponentState, STORAGE_KEYS, WantType } from '@/lib/store';
-import { analyzeEmotions } from '@/services/geminiService';
+import { AppSettings, saveRecord, getComponentState, saveComponentState, STORAGE_KEYS, WantType, BackgroundTask, getBackgroundTask, clearBackgroundTask } from '@/lib/store';
+import { analyzeEmotions, safeJSONParse } from '@/services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Heart, Settings2, Smile, Zap, Layers, Search, Loader2, RefreshCcw, ArrowRight, Save, ChevronLeft, LogOut, Plus, Mic } from 'lucide-react';
 import { VoiceInput } from './VoiceInput';
@@ -58,7 +58,7 @@ const WANT_LABELS: Record<WantType, string> = {
   security: '想要安全',
 };
 
-export default function CustomRelease({ settings }: { settings?: AppSettings }) {
+export default function CustomRelease({ settings, bgTask, clearBgTask }: { settings?: AppSettings; bgTask: BackgroundTask | null; clearBgTask: () => void }) {
   const [phase, setPhase] = useState<'entry' | 'want_config' | 'emotion_source' | 'emotion_select' | 'ai_analyze' | 'release' | 'post_release'>(() => getComponentState(STORAGE_KEYS.CUSTOM_STATE)?.phase || 'entry');
   const [selectedMode, setSelectedMode] = useState<any>(() => getComponentState(STORAGE_KEYS.CUSTOM_STATE)?.selectedMode || RELEASE_MODES[0]);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>(() => getComponentState(STORAGE_KEYS.CUSTOM_STATE)?.selectedEmotions || []);
@@ -118,6 +118,25 @@ export default function CustomRelease({ settings }: { settings?: AppSettings }) 
       stepIndex
     });
   }, [phase, selectedMode, selectedEmotions, selectedCategories, inputText, aiAnalysis, stepIndex]);
+
+  useEffect(() => {
+    const task = getBackgroundTask();
+    if (task && task.status === 'done' && task.tab === 'custom' && task.result) {
+      try {
+        const parsed = typeof task.result === 'string' ? safeJSONParse(task.result) : task.result;
+        if (parsed) {
+          setAiAnalysis(parsed);
+          if (parsed.emo) setSelectedEmotions(parsed.emo);
+          if (parsed.cat) setSelectedCategories(parsed.cat);
+          setPhase('ai_analyze');
+          setIsAnalyzing(false);
+        }
+      } catch (e) {
+        console.error('Failed to restore background task result:', e);
+      }
+      clearBackgroundTask();
+    }
+  }, []);
 
   const startRelease = () => {
     let list: {s: string, w: string[], c?: string}[] = [];
@@ -215,7 +234,8 @@ export default function CustomRelease({ settings }: { settings?: AppSettings }) 
           aiBaseUrl: settings?.useCustomConfig ? settings.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings.aiModelName : undefined
-        }
+        },
+        'custom'
       );
       setAiAnalysis(result);
       setSelectedEmotions(result.emo);

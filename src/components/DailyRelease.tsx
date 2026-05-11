@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { analyzeReleaseText } from '@/services/geminiService';
-import { AppSettings, saveRecord, WantType, addStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS } from '@/lib/store';
+import { analyzeReleaseText, safeJSONParse } from '@/services/geminiService';
+import { AppSettings, saveRecord, WantType, addStuckSentence, getComponentState, saveComponentState, STORAGE_KEYS, BackgroundTask, getBackgroundTask, clearBackgroundTask } from '@/lib/store';
 import { Loader2, Plus, CheckCircle2, RefreshCcw, ArrowRight, ArrowLeft, X, Zap, LogOut, Save, ChevronLeft, StickyNote, Mic } from 'lucide-react';
 import { VoiceInput } from './VoiceInput';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,7 +39,7 @@ function getAnalysisSummary(analysis: any) {
   return analysis?.sum || analysis?.ana || '';
 }
 
-export default function DailyRelease({ settings }: { settings?: AppSettings }) {
+export default function DailyRelease({ settings, bgTask, clearBgTask }: { settings?: AppSettings; bgTask: BackgroundTask | null; clearBgTask: () => void }) {
   const [text, setText] = useState(() => getComponentState(STORAGE_KEYS.DAILY_STATE)?.text || '');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any>(() => getComponentState(STORAGE_KEYS.DAILY_STATE)?.analysis || null);
@@ -94,6 +94,23 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
     });
   }, [text, analysis, step, currentSentenceIndex, releasedIndices, skippedIndices, sixStepIndex]);
 
+  useEffect(() => {
+    const task = getBackgroundTask();
+    if (task && task.status === 'done' && task.tab === 'daily' && task.result) {
+      try {
+        const parsed = typeof task.result === 'string' ? safeJSONParse(task.result) : task.result;
+        if (parsed) {
+          setAnalysis(parsed);
+          setStep('analysis');
+          setIsAnalyzing(false);
+        }
+      } catch (e) {
+        console.error('Failed to restore background task result:', e);
+      }
+      clearBackgroundTask();
+    }
+  }, []);
+
   const handleAnalyze = async () => {
     if (!text.trim()) return;
     setIsAnalyzing(true);
@@ -115,7 +132,8 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
           aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-        }
+        },
+        'daily'
       );
       setAnalysis(result);
       
@@ -460,7 +478,8 @@ export default function DailyRelease({ settings }: { settings?: AppSettings }) {
           aiBaseUrl: settings?.useCustomConfig ? settings?.aiBaseUrl : undefined,
           aiApiKey: settings?.useCustomConfig ? settings?.aiApiKey : undefined,
           aiModelName: settings?.useCustomConfig ? settings?.aiModelName : undefined
-        }
+        },
+        'daily'
       );
       
       if (result && result.list) {

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { getSettings, AppSettings, saveSettings } from '@/lib/store';
+import { getSettings, AppSettings, saveSettings, getBackgroundTask, onBackgroundTaskChange, clearBackgroundTask, BackgroundTask } from '@/lib/store';
 import DailyRelease from '@/components/DailyRelease';
 import AreaRelease from '@/components/AreaRelease';
 import FocusedRelease from '@/components/FocusedRelease';
@@ -22,11 +22,18 @@ export default function App() {
   const [hasNewVersion, setHasNewVersion] = useState(false);
   const [globalIsAnalyzing, setGlobalIsAnalyzing] = useState(false);
   const [analyzingTab, setAnalyzingTab] = useState<string | null>(null);
+  const [bgTask, setBgTask] = useState<BackgroundTask | null>(getBackgroundTask());
   const CURRENT_VERSION = '1.0.1';
 
   useEffect(() => {
     document.documentElement.className = settings.theme;
   }, [settings.theme]);
+
+  useEffect(() => {
+    return onBackgroundTaskChange(() => {
+      setBgTask(getBackgroundTask());
+    });
+  }, []);
 
   useEffect(() => {
     const checkVersion = async () => {
@@ -106,10 +113,10 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
           >
-            {activeTab === 'daily' && <DailyRelease settings={settings} />}
-            {activeTab === 'area' && <AreaRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
-            {activeTab === 'focused' && <FocusedRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} />}
-            {activeTab === 'custom' && <CustomRelease settings={settings} />}
+            {activeTab === 'daily' && <DailyRelease settings={settings} bgTask={bgTask} clearBgTask={clearBackgroundTask} />}
+            {activeTab === 'area' && <AreaRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} bgTask={bgTask} clearBgTask={clearBackgroundTask} />}
+            {activeTab === 'focused' && <FocusedRelease settings={settings} globalIsAnalyzing={globalIsAnalyzing} setGlobalIsAnalyzing={setGlobalIsAnalyzing} analyzingTab={analyzingTab} setAnalyzingTab={setAnalyzingTab} bgTask={bgTask} clearBgTask={clearBackgroundTask} />}
+            {activeTab === 'custom' && <CustomRelease settings={settings} bgTask={bgTask} clearBgTask={clearBackgroundTask} />}
             {activeTab === 'history' && <History />}
             {activeTab === 'settings' && <Settings settings={settings} onSettingsChange={setSettings} />}
           </motion.div>
@@ -117,6 +124,12 @@ export default function App() {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/80 backdrop-blur-md pb-safe z-50">
+        {bgTask?.status === 'running' && (
+          <div className="flex items-center justify-center gap-2 py-1.5 bg-primary/10 text-primary text-xs font-medium">
+            <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
+            AI 后台运行中...
+          </div>
+        )}
         <div className="container mx-auto px-4 h-16 flex items-center justify-around">
           <NavButton 
             active={activeTab === 'daily'} 
