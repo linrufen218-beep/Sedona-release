@@ -1,5 +1,5 @@
 ﻿const WORKER_URL = 'https://fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com/rufen';
-const REQUEST_TIMEOUT_MS = 90_000;
+const REQUEST_TIMEOUT_MS = 180_000;
 const NETWORK_RETRY_DELAYS_MS = [800, 1800];
 
 type AIOptions = {
@@ -81,7 +81,7 @@ function isAbortError(err: any) {
 }
 
 function isRetriableNetworkError(err: any) {
-  return err instanceof TypeError || isAbortError(err);
+  return err instanceof TypeError;
 }
 
 function formatBytes(bytes: number) {
@@ -212,7 +212,7 @@ export async function callAI(
   } catch (err: any) {
     console.error('[API Error]', err);
     if (isAbortError(err)) {
-      throw new Error(`AI 请求超时：${REQUEST_TIMEOUT_MS / 1000}s 内没有收到 worker 响应。请求大小约 ${formatBytes(err.requestSizeBytes || 0)}，文本较长时请分段重试。`);
+      throw new Error(`AI 请求超时：${REQUEST_TIMEOUT_MS / 1000}s 内没有收到 worker 响应。请求大小约 ${formatBytes(err.requestSizeBytes || 0)}。这通常是模型生成较慢、worker 或上游接口超时，不一定是文本太长。请稍后重试，或换更快的模型/减少生成要求。`);
     }
     if (err instanceof TypeError) {
       throw new Error(`浏览器没有拿到 worker 的 HTTP 响应，通常是网络中断、CORS/preflight 被拦、请求体过大或 worker 异常响应缺少 CORS 头。请求大小约 ${formatBytes((err as any).requestSizeBytes || 0)}。`);
