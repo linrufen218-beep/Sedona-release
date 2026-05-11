@@ -101,7 +101,8 @@ async function postToWorker(body: any) {
       return await fetch(WORKER_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          // Keep the JSON body, but send it as a simple request to avoid CORS preflight failures.
+          'Content-Type': 'text/plain;charset=UTF-8',
         },
         body: payload,
         signal: controller.signal,
@@ -215,7 +216,7 @@ export async function callAI(
       throw new Error(`AI 请求超时：${REQUEST_TIMEOUT_MS / 1000}s 内没有收到 worker 响应。请求大小约 ${formatBytes(err.requestSizeBytes || 0)}。这通常是模型生成较慢、worker 或上游接口超时，不一定是文本太长。请稍后重试，或换更快的模型/减少生成要求。`);
     }
     if (err instanceof TypeError) {
-      throw new Error(`浏览器没有拿到 worker 的 HTTP 响应，通常是网络中断、CORS/preflight 被拦、请求体过大或 worker 异常响应缺少 CORS 头。请求大小约 ${formatBytes((err as any).requestSizeBytes || 0)}。`);
+      throw new Error(`浏览器没有拿到 worker 的 HTTP 响应，通常是代理/VPN 中断、网络被重置、CORS/preflight 被拦，或 worker 异常响应缺少 CORS 头。请求大小约 ${formatBytes((err as any).requestSizeBytes || 0)}。如果正在开代理，请把 *.bspapp.com 或 fc-mp-31707de5-7305-41e5-aeee-60eee477448d.next.bspapp.com 设为直连后重试。`);
     }
     throw err;
   }
